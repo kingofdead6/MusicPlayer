@@ -5,6 +5,9 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import dev.nk.musicplayer.data.db.AppDatabase
 import dev.nk.musicplayer.data.library.LibraryRepository
 import dev.nk.musicplayer.data.library.MediaStoreScanner
+import dev.nk.musicplayer.data.llm.AiPlaylistGenerator
+import dev.nk.musicplayer.data.llm.LlmClient
+import dev.nk.musicplayer.data.llm.LlmConfig
 import dev.nk.musicplayer.data.playlist.M3uExporter
 import dev.nk.musicplayer.data.playlist.PlaylistRepository
 import dev.nk.musicplayer.playback.PlayerConnection
@@ -27,6 +30,11 @@ class AppContainer(private val context: Context) {
     }
 
     val m3uExporter: M3uExporter by lazy { M3uExporter(context) }
+
+    /** The only part of the app that touches the network. */
+    val aiPlaylistGenerator: AiPlaylistGenerator by lazy {
+        AiPlaylistGenerator(libraryRepository, LlmClient(LlmConfig.fromBuildConfig()))
+    }
 
     val queueStore: QueueStore by lazy { QueueStore(context) }
 

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.PlaylistPlay
 import androidx.compose.material3.Icon
@@ -31,6 +32,8 @@ import dev.nk.musicplayer.LocalContainer
 import dev.nk.musicplayer.data.db.Track
 import dev.nk.musicplayer.playback.PlaySource
 import dev.nk.musicplayer.ui.components.MiniPlayer
+import dev.nk.musicplayer.ui.ai.AiScreen
+import dev.nk.musicplayer.ui.ai.AiViewModel
 import dev.nk.musicplayer.ui.components.TrackActionsSheet
 import dev.nk.musicplayer.ui.library.AlbumDetailScreen
 import dev.nk.musicplayer.ui.library.ArtistDetailScreen
@@ -45,6 +48,7 @@ import dev.nk.musicplayer.ui.playlists.PlaylistsScreen
 object Routes {
     const val LIBRARY = "library"
     const val PLAYLISTS = "playlists"
+    const val AI = "ai"
     const val ARTIST = "artist/{artist}"
     const val ALBUM = "album/{albumId}"
     const val PLAYLIST = "playlist/{playlistId}"
@@ -58,7 +62,8 @@ object Routes {
 
 private enum class TopLevel(val route: String, val label: String, val icon: ImageVector) {
     Library(Routes.LIBRARY, "Library", Icons.Rounded.LibraryMusic),
-    Playlists(Routes.PLAYLISTS, "Playlists", Icons.Rounded.PlaylistPlay)
+    Playlists(Routes.PLAYLISTS, "Playlists", Icons.Rounded.PlaylistPlay),
+    Ai(Routes.AI, "AI", Icons.Rounded.AutoAwesome)
 }
 
 /** Routes that own the full screen and therefore hide the mini player and the tab bar. */
@@ -77,6 +82,9 @@ fun AppNavigation(modifier: Modifier = Modifier) {
     // survive navigating into an album and back.
     val libraryViewModel: LibraryViewModel =
         viewModel(factory = LibraryViewModel.factory(container.libraryRepository))
+    val aiViewModel: AiViewModel = viewModel(
+        factory = AiViewModel.factory(container.aiPlaylistGenerator, container.playlistRepository)
+    )
 
     var actionTrack by remember { mutableStateOf<Track?>(null) }
 
@@ -107,6 +115,14 @@ fun AppNavigation(modifier: Modifier = Modifier) {
             }
             composable(Routes.PLAYLISTS) {
                 PlaylistsScreen(
+                    onOpenPlaylist = { navController.navigate(Routes.playlist(it)) },
+                    contentPadding = PaddingValues(bottom = 8.dp)
+                )
+            }
+            composable(Routes.AI) {
+                AiScreen(
+                    viewModel = aiViewModel,
+                    onPlay = onPlay,
                     onOpenPlaylist = { navController.navigate(Routes.playlist(it)) },
                     contentPadding = PaddingValues(bottom = 8.dp)
                 )
