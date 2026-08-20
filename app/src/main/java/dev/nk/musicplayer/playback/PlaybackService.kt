@@ -158,10 +158,14 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
+    /**
+     * Only the codes that really mean "this file is not there any more". A generic IO error
+     * skips the track but leaves it in the library, since hiding it on a transient failure
+     * would be worse than playing it again next time.
+     */
     private fun Int.isMissingFile(): Boolean =
         this == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND ||
-            this == PlaybackException.ERROR_CODE_IO_NO_PERMISSION ||
-            this == PlaybackException.ERROR_CODE_IO_UNSPECIFIED
+            this == PlaybackException.ERROR_CODE_IO_NO_PERMISSION
 
     private fun restoreLastQueue(player: Player) {
         scope.launch {

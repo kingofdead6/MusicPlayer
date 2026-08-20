@@ -68,13 +68,20 @@ class LibraryRepository(
      */
     suspend fun rescan(): ScanResult = withContext(Dispatchers.IO) {
         val found = scanner.scan()
-        val known = trackDao.idsAndModified().associate { it.id to it.dateModified }
+        val known = trackDao.fingerprints().associateBy { it.id }
 
-        val changed = found.filter { known[it.id] != it.dateModified }
+        // Rewrite a row when the file changed, when it is new, or when it was previously
+        // marked missing and has come back -- otherwise a restored file would stay hidden
+        // forever, since its DATE_MODIFIED never changed.
+        val changed = found.filter { track ->
+            val previous = known[track.id]
+            previous == null || previous.dateModified != track.dateModified || previous.isMissing
+        }
         if (changed.isNotEmpty()) trackDao.upsertAll(changed)
 
         val foundIds = found.mapTo(HashSet()) { it.id }
-        val goneIds = known.keys.filterNot { it in foundIds }
+        // Only rows that are newly gone; ones already flagged need no write.
+        val goneIds = known.values.filter { !it.isMissing && it.id !in foundIds }.map { it.id }
         // Chunked because SQLite caps the number of bound variables at 999.
         goneIds.chunked(500).forEach { trackDao.markMissing(it) }
 

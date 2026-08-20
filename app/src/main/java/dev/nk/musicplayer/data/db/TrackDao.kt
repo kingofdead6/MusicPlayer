@@ -12,8 +12,8 @@ interface TrackDao {
     @Upsert
     suspend fun upsertAll(tracks: List<Track>)
 
-    @Query("SELECT id, dateModified FROM tracks")
-    suspend fun idsAndModified(): List<TrackFingerprint>
+    @Query("SELECT id, dateModified, isMissing FROM tracks")
+    suspend fun fingerprints(): List<TrackFingerprint>
 
     @Query("UPDATE tracks SET isMissing = 1 WHERE id IN (:ids)")
     suspend fun markMissing(ids: List<Long>)
@@ -104,4 +104,4 @@ interface TrackDao {
     suspend fun tracksByAlbum(albumId: Long): List<Track>
 }
 
-data class TrackFingerprint(val id: Long, val dateModified: Long)
+data class TrackFingerprint(val id: Long, val dateModified: Long, val isMissing: Boolean)
