@@ -34,11 +34,15 @@ class PlaybackService : MediaSessionService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var mediaSession: MediaSession? = null
     private lateinit var queueStore: QueueStore
+    private lateinit var playLogger: PlayLogger
 
     override fun onCreate() {
         super.onCreate()
         val app = application as MusicApp
         queueStore = app.container.queueStore
+        // The logger writes on the container's process-lifetime scope, so the final event
+        // still lands after this service's own scope is cancelled.
+        playLogger = PlayLogger(app.container.database.playEventDao(), app.container.ioScope)
 
         val player = ExoPlayer.Builder(this)
             .setAudioAttributes(
@@ -55,6 +59,7 @@ class PlaybackService : MediaSessionService() {
             .build()
 
         player.addListener(PlayerEvents(player))
+        player.addListener(playLogger)
 
         val sessionActivity = PendingIntent.getActivity(
             this,
@@ -86,6 +91,8 @@ class PlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         mediaSession?.let { session ->
+            // Don't lose the track that was in progress when the service is torn down.
+            playLogger.flush(session.player.currentPosition)
             persist(session.player)
             session.player.release()
             session.release()

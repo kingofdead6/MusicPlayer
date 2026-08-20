@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Insights
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.PlaylistPlay
 import androidx.compose.material3.Icon
@@ -44,11 +45,14 @@ import dev.nk.musicplayer.ui.nowplaying.QueueScreen
 import dev.nk.musicplayer.ui.permission.RequestNotificationPermissionOnce
 import dev.nk.musicplayer.ui.playlists.PlaylistDetailScreen
 import dev.nk.musicplayer.ui.playlists.PlaylistsScreen
+import dev.nk.musicplayer.ui.stats.StatsScreen
+import dev.nk.musicplayer.ui.stats.StatsViewModel
 
 object Routes {
     const val LIBRARY = "library"
     const val PLAYLISTS = "playlists"
     const val AI = "ai"
+    const val STATS = "stats"
     const val ARTIST = "artist/{artist}"
     const val ALBUM = "album/{albumId}"
     const val PLAYLIST = "playlist/{playlistId}"
@@ -63,7 +67,8 @@ object Routes {
 private enum class TopLevel(val route: String, val label: String, val icon: ImageVector) {
     Library(Routes.LIBRARY, "Library", Icons.Rounded.LibraryMusic),
     Playlists(Routes.PLAYLISTS, "Playlists", Icons.Rounded.PlaylistPlay),
-    Ai(Routes.AI, "AI", Icons.Rounded.AutoAwesome)
+    Ai(Routes.AI, "AI", Icons.Rounded.AutoAwesome),
+    Stats(Routes.STATS, "Stats", Icons.Rounded.Insights)
 }
 
 /** Routes that own the full screen and therefore hide the mini player and the tab bar. */
@@ -85,6 +90,8 @@ fun AppNavigation(modifier: Modifier = Modifier) {
     val aiViewModel: AiViewModel = viewModel(
         factory = AiViewModel.factory(container.aiPlaylistGenerator, container.playlistRepository)
     )
+    val statsViewModel: StatsViewModel =
+        viewModel(factory = StatsViewModel.factory(container.statsRepository))
 
     var actionTrack by remember { mutableStateOf<Track?>(null) }
 
@@ -124,6 +131,12 @@ fun AppNavigation(modifier: Modifier = Modifier) {
                     viewModel = aiViewModel,
                     onPlay = onPlay,
                     onOpenPlaylist = { navController.navigate(Routes.playlist(it)) },
+                    contentPadding = PaddingValues(bottom = 8.dp)
+                )
+            }
+            composable(Routes.STATS) {
+                StatsScreen(
+                    viewModel = statsViewModel,
                     contentPadding = PaddingValues(bottom = 8.dp)
                 )
             }

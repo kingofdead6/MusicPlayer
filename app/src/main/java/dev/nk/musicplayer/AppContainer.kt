@@ -11,13 +11,23 @@ import dev.nk.musicplayer.data.llm.LlmConfig
 import dev.nk.musicplayer.data.playlist.M3uExporter
 import dev.nk.musicplayer.data.playlist.PlaylistRepository
 import dev.nk.musicplayer.playback.PlayerConnection
+import dev.nk.musicplayer.data.stats.StatsRepository
 import dev.nk.musicplayer.playback.QueueStore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 
 /**
  * Manual dependency wiring. One user, one process, no DI framework: everything the app needs
  * is built lazily here and reached through [LocalContainer] or [MusicApp.container].
  */
 class AppContainer(private val context: Context) {
+
+    /**
+     * Process-lifetime scope for writes that must not be cancelled by whatever component
+     * started them — notably the last play event as the playback service is torn down.
+     */
+    val ioScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     val database: AppDatabase by lazy { AppDatabase.build(context) }
 
@@ -30,6 +40,8 @@ class AppContainer(private val context: Context) {
     }
 
     val m3uExporter: M3uExporter by lazy { M3uExporter(context) }
+
+    val statsRepository: StatsRepository by lazy { StatsRepository(database.playEventDao()) }
 
     /** The only part of the app that touches the network. */
     val aiPlaylistGenerator: AiPlaylistGenerator by lazy {

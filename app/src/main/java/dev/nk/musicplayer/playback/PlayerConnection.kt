@@ -43,6 +43,9 @@ class PlayerConnection(private val context: Context) {
     private var controller: MediaController? = null
     private var ticker: Job? = null
 
+    /** False once [release] has been called, so a late-arriving controller is discarded. */
+    private var wanted = false
+
     private val _state = MutableStateFlow(PlayerUiState())
     val state: StateFlow<PlayerUiState> = _state.asStateFlow()
 
@@ -51,18 +54,26 @@ class PlayerConnection(private val context: Context) {
     }
 
     fun connect() {
-        if (controller != null) return
+        if (controller != null || wanted) return
+        wanted = true
         val token = SessionToken(context, ComponentName(context, PlaybackService::class.java))
         val future = MediaController.Builder(context, token).buildAsync()
         future.addListener({
-            controller = runCatching { future.get() }.getOrNull()
-            controller?.addListener(listener)
+            val connected = runCatching { future.get() }.getOrNull()
+            if (!wanted) {
+                // Released while we were connecting; hand it straight back.
+                connected?.release()
+                return@addListener
+            }
+            controller = connected
+            connected?.addListener(listener)
             publish()
             startTicker()
         }, ContextCompat.getMainExecutor(context))
     }
 
     fun release() {
+        wanted = false
         ticker?.cancel()
         ticker = null
         controller?.removeListener(listener)
