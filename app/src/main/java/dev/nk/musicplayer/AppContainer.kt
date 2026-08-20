@@ -5,6 +5,8 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import dev.nk.musicplayer.data.db.AppDatabase
 import dev.nk.musicplayer.data.library.LibraryRepository
 import dev.nk.musicplayer.data.library.MediaStoreScanner
+import dev.nk.musicplayer.data.playlist.M3uExporter
+import dev.nk.musicplayer.data.playlist.PlaylistRepository
 import dev.nk.musicplayer.playback.PlayerConnection
 import dev.nk.musicplayer.playback.QueueStore
 
@@ -19,6 +21,12 @@ class AppContainer(private val context: Context) {
     val libraryRepository: LibraryRepository by lazy {
         LibraryRepository(database.trackDao(), MediaStoreScanner(context))
     }
+
+    val playlistRepository: PlaylistRepository by lazy {
+        PlaylistRepository(database.playlistDao())
+    }
+
+    val m3uExporter: M3uExporter by lazy { M3uExporter(context) }
 
     val queueStore: QueueStore by lazy { QueueStore(context) }
 

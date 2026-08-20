@@ -12,6 +12,12 @@
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
 
+    <!-- Needed only on API 26..28 to write the exported .m3u8 into Music/Playlists/;
+         API 29+ creates it through MediaStore with no runtime permission at all. -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+
     <!-- Media notification on API 33+. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 

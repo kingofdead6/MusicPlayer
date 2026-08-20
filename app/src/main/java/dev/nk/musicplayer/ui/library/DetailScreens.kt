@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -30,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.nk.musicplayer.data.db.Track
+import dev.nk.musicplayer.playback.PlaySource
 import dev.nk.musicplayer.ui.components.AlbumArt
 import dev.nk.musicplayer.ui.components.TrackRow
 import dev.nk.musicplayer.util.formatDurationLong
@@ -40,6 +42,7 @@ fun ArtistDetailScreen(
     artist: String,
     viewModel: LibraryViewModel,
     onPlay: (List<Track>, Int, String) -> Unit,
+    onTrackMenu: (Track) -> Unit,
     onBack: () -> Unit,
     contentPadding: PaddingValues
 ) {
@@ -52,6 +55,7 @@ fun ArtistDetailScreen(
         artworkAlbumId = tracks.firstOrNull()?.albumId,
         tracks = tracks,
         onPlay = onPlay,
+        onTrackMenu = onTrackMenu,
         onBack = onBack,
         contentPadding = contentPadding
     )
@@ -62,6 +66,7 @@ fun AlbumDetailScreen(
     albumId: Long,
     viewModel: LibraryViewModel,
     onPlay: (List<Track>, Int, String) -> Unit,
+    onTrackMenu: (Track) -> Unit,
     onBack: () -> Unit,
     contentPadding: PaddingValues
 ) {
@@ -79,6 +84,7 @@ fun AlbumDetailScreen(
         artworkAlbumId = albumId,
         tracks = tracks,
         onPlay = onPlay,
+        onTrackMenu = onTrackMenu,
         onBack = onBack,
         contentPadding = contentPadding
     )
@@ -92,6 +98,7 @@ private fun TrackListDetail(
     artworkAlbumId: Long?,
     tracks: List<Track>,
     onPlay: (List<Track>, Int, String) -> Unit,
+    onTrackMenu: (Track) -> Unit,
     onBack: () -> Unit,
     contentPadding: PaddingValues
 ) {
@@ -131,7 +138,7 @@ private fun TrackListDetail(
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             FilledTonalButton(
-                                onClick = { if (tracks.isNotEmpty()) onPlay(tracks, 0, "library") },
+                                onClick = { if (tracks.isNotEmpty()) onPlay(tracks, 0, PlaySource.LIBRARY) },
                                 enabled = tracks.isNotEmpty()
                             ) {
                                 Icon(Icons.Rounded.PlayArrow, contentDescription = null,
@@ -140,7 +147,7 @@ private fun TrackListDetail(
                             }
                             FilledTonalButton(
                                 onClick = {
-                                    if (tracks.isNotEmpty()) onPlay(tracks.shuffled(), 0, "shuffle")
+                                    if (tracks.isNotEmpty()) onPlay(tracks.shuffled(), 0, PlaySource.SHUFFLE)
                                 },
                                 enabled = tracks.isNotEmpty()
                             ) {
@@ -153,7 +160,15 @@ private fun TrackListDetail(
                 }
             }
             items(tracks, key = { it.id }) { track ->
-                TrackRow(track = track, onClick = { onPlay(tracks, tracks.indexOf(track), "library") })
+                TrackRow(
+                    track = track,
+                    onClick = { onPlay(tracks, tracks.indexOf(track), PlaySource.LIBRARY) },
+                    trailing = {
+                        IconButton(onClick = { onTrackMenu(track) }) {
+                            Icon(Icons.Rounded.MoreVert, contentDescription = "Track actions")
+                        }
+                    }
+                )
             }
         }
     }

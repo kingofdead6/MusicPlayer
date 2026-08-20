@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.LibraryMusic
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Shuffle
@@ -47,6 +48,7 @@ import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import dev.nk.musicplayer.data.db.Track
+import dev.nk.musicplayer.playback.PlaySource
 import dev.nk.musicplayer.ui.components.AlbumArt
 import dev.nk.musicplayer.ui.components.EmptyState
 import dev.nk.musicplayer.ui.components.TrackRow
@@ -59,6 +61,7 @@ private enum class LibraryTab(val label: String) { Songs("Songs"), Artists("Arti
 fun LibraryScreen(
     viewModel: LibraryViewModel,
     onPlay: (tracks: List<Track>, index: Int, source: String) -> Unit,
+    onTrackMenu: (Track) -> Unit,
     onOpenArtist: (String) -> Unit,
     onOpenAlbum: (Long) -> Unit,
     contentPadding: PaddingValues,
@@ -111,7 +114,7 @@ fun LibraryScreen(
             modifier = Modifier.fillMaxSize()
         ) {
             when (LibraryTab.entries[tab]) {
-                LibraryTab.Songs -> SongsTab(viewModel, trackCount, query, contentPadding, onPlay)
+                LibraryTab.Songs -> SongsTab(viewModel, trackCount, query, contentPadding, onPlay, onTrackMenu)
                 LibraryTab.Artists -> ArtistsTab(viewModel, contentPadding, onOpenArtist)
                 LibraryTab.Albums -> AlbumsTab(viewModel, contentPadding, onOpenAlbum)
             }
@@ -125,7 +128,8 @@ private fun SongsTab(
     trackCount: Int,
     query: String,
     contentPadding: PaddingValues,
-    onPlay: (List<Track>, Int, String) -> Unit
+    onPlay: (List<Track>, Int, String) -> Unit,
+    onTrackMenu: (Track) -> Unit
 ) {
     val items = viewModel.pagedTracks.collectAsLazyPagingItems()
     val scope = rememberCoroutineScope()
@@ -167,7 +171,7 @@ private fun SongsTab(
                 FilledTonalButton(onClick = {
                     scope.launch {
                         val all = viewModel.shuffleQueue()
-                        if (all.isNotEmpty()) onPlay(all, 0, "shuffle")
+                        if (all.isNotEmpty()) onPlay(all, 0, PlaySource.SHUFFLE)
                     }
                 }) {
                     Icon(Icons.Rounded.Shuffle, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -183,7 +187,12 @@ private fun SongsTab(
                     onClick = {
                         scope.launch {
                             val (queue, start) = viewModel.queueForSongsList(track.id)
-                            if (queue.isNotEmpty()) onPlay(queue, start, "library")
+                            if (queue.isNotEmpty()) onPlay(queue, start, PlaySource.LIBRARY)
+                        }
+                    },
+                    trailing = {
+                        IconButton(onClick = { onTrackMenu(track) }) {
+                            Icon(Icons.Rounded.MoreVert, contentDescription = "Track actions")
                         }
                     }
                 )
