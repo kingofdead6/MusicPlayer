@@ -5,6 +5,8 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import dev.nk.musicplayer.data.db.AppDatabase
 import dev.nk.musicplayer.data.library.LibraryRepository
 import dev.nk.musicplayer.data.library.MediaStoreScanner
+import dev.nk.musicplayer.playback.PlayerConnection
+import dev.nk.musicplayer.playback.QueueStore
 
 /**
  * Manual dependency wiring. One user, one process, no DI framework: everything the app needs
@@ -17,6 +19,11 @@ class AppContainer(private val context: Context) {
     val libraryRepository: LibraryRepository by lazy {
         LibraryRepository(database.trackDao(), MediaStoreScanner(context))
     }
+
+    val queueStore: QueueStore by lazy { QueueStore(context) }
+
+    /** Shared by the whole UI; connected while an Activity is started. */
+    val playerConnection: PlayerConnection by lazy { PlayerConnection(context) }
 }
 
 val LocalContainer = staticCompositionLocalOf<AppContainer> {

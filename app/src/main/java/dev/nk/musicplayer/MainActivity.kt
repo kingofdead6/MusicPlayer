@@ -14,9 +14,10 @@ import dev.nk.musicplayer.ui.theme.MusicPlayerTheme
 
 class MainActivity : ComponentActivity() {
 
+    private val container: AppContainer by lazy { (application as MusicApp).container }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val container = (application as MusicApp).container
 
         setContent {
             MusicPlayerTheme {
@@ -30,5 +31,17 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // Binding here (rather than in the Application) means the service is free to stop
+        // once nothing is playing and the UI is gone.
+        container.playerConnection.connect()
+    }
+
+    override fun onStop() {
+        container.playerConnection.release()
+        super.onStop()
     }
 }
