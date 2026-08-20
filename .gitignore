@@ -1,0 +1,16 @@
+# Secrets & local machine config — never commit
+local.properties
+
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+app/build/
+*.apk
+*.aab
+*.hprof

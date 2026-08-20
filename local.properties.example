@@ -1,0 +1,10 @@
+# Copy to local.properties and fill in. local.properties is git-ignored.
+# Android SDK location (set by Android Studio automatically).
+sdk.dir=/path/to/Android/sdk
+
+# OpenAI-compatible chat-completions endpoint used for AI playlist generation.
+# Base URL only — the client appends /chat/completions itself.
+# Huawei ModelArts (GLM) example:
+LLM_BASE_URL=https://api.modelarts-maas.com/v1
+LLM_API_KEY=put-your-key-here
+LLM_MODEL=GLM-5.1
