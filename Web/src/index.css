@@ -5,8 +5,8 @@
   --border: #26262f;
   --text: #f2f2f5;
   --muted: #a0a0ad;
-  --accent: #7c5cff;
-  --accent-2: #23d5ab;
+  --accent: #ff4d4d;
+  --accent-2: #ffa63d;
   --radius: 16px;
   --max: 1080px;
 
@@ -118,7 +118,7 @@ img {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--accent), #5b8cff);
+  background: linear-gradient(135deg, var(--accent), #e02f5f);
   color: #fff;
 }
 
@@ -156,7 +156,7 @@ img {
   transform: translateX(-50%);
   background: radial-gradient(
     ellipse at center,
-    rgba(124, 92, 255, 0.28),
+    rgba(255, 77, 77, 0.28),
     transparent 68%
   );
   pointer-events: none;
@@ -279,7 +279,7 @@ h1 {
 .chip.on {
   border-color: var(--accent);
   color: var(--text);
-  background: rgba(124, 92, 255, 0.14);
+  background: rgba(255, 77, 77, 0.14);
 }
 
 .track {
@@ -407,8 +407,8 @@ h2 {
   border-radius: 10px;
   display: grid;
   place-items: center;
-  background: rgba(124, 92, 255, 0.14);
-  border: 1px solid rgba(124, 92, 255, 0.28);
+  background: rgba(255, 77, 77, 0.14);
+  border: 1px solid rgba(255, 77, 77, 0.28);
 }
 
 .icon svg {
@@ -424,8 +424,8 @@ h2 {
   border-radius: var(--radius);
   background: linear-gradient(
     135deg,
-    rgba(35, 213, 171, 0.07),
-    rgba(124, 92, 255, 0.07)
+    rgba(255, 166, 61, 0.07),
+    rgba(255, 77, 77, 0.07)
   );
   padding: 32px;
   display: grid;
