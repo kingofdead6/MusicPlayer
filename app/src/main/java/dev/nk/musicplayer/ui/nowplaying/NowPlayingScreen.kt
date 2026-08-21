@@ -1,5 +1,10 @@
 package dev.nk.musicplayer.ui.nowplaying
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,13 +27,14 @@ import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,12 +42,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.nk.musicplayer.LocalContainer
 import dev.nk.musicplayer.playback.PlayerUiState
 import dev.nk.musicplayer.ui.components.AlbumArt
+import dev.nk.musicplayer.ui.theme.LocalGlowEnabled
+import dev.nk.musicplayer.ui.theme.accentGlow
 import dev.nk.musicplayer.util.formatDuration
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -60,12 +71,35 @@ fun NowPlayingScreen(
     val track = state.current
 
     // While the thumb is held, show where the finger is, not where the player still is.
-    var scrubbing by remember { mutableStateOf(false) }
-    var scrubPosition by remember { mutableStateOf(0f) }
+    var scrubOverride by remember { mutableStateOf<Long?>(null) }
+    val seekStyle by LocalContainer.current.settingsStore.seekBarStyle.collectAsStateWithLifecycle()
+
+    val scheme = MaterialTheme.colorScheme
+    val glow = LocalGlowEnabled.current
+
+    // The art glows brighter while playing and settles when paused, so the screen has a
+    // visible heartbeat without any audio analysis.
+    val transition = rememberInfiniteTransition(label = "artPulse")
+    val pulse by transition.animateFloat(
+        initialValue = 0.55f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(2400), RepeatMode.Reverse),
+        label = "artPulse"
+    )
+    val artIntensity = when {
+        !glow -> 0f
+        state.isPlaying -> pulse
+        else -> 0.4f
+    }
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
+                ),
                 title = { Text("Now playing") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -94,6 +128,7 @@ fun NowPlayingScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
+                    .accentGlow(cornerRadius = 16.dp, radius = 40.dp, intensity = artIntensity)
             )
             Spacer(Modifier.height(24.dp))
             Text(
@@ -113,20 +148,17 @@ fun NowPlayingScreen(
             )
 
             Spacer(Modifier.height(24.dp))
-            val duration = state.durationMs.coerceAtLeast(1L)
-            val displayed = if (scrubbing) scrubPosition else state.positionMs.toFloat()
-            Slider(
-                value = displayed.coerceIn(0f, duration.toFloat()),
-                valueRange = 0f..duration.toFloat(),
-                onValueChange = {
-                    scrubbing = true
-                    scrubPosition = it
-                },
-                onValueChangeFinished = {
-                    scrubbing = false
-                    onSeek(scrubPosition.toLong())
-                },
-                enabled = track != null
+            // While scrubbing, the elapsed label follows the finger; SeekBar reports the
+            // in-flight position and clears it on release.
+            val displayed = scrubOverride?.toFloat() ?: state.positionMs.toFloat()
+            SeekBar(
+                positionMs = state.positionMs,
+                durationMs = state.durationMs,
+                isPlaying = state.isPlaying,
+                style = seekStyle,
+                onSeek = onSeek,
+                enabled = track != null,
+                onScrubChange = { scrubOverride = it }
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -157,7 +189,17 @@ fun NowPlayingScreen(
                 FilledIconButton(
                     onClick = onTogglePlayPause,
                     enabled = state.hasQueue,
-                    modifier = Modifier.size(64.dp)
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = scheme.primary,
+                        contentColor = scheme.onPrimary
+                    ),
+                    modifier = Modifier
+                        .size(64.dp)
+                        .accentGlow(
+                            cornerRadius = 32.dp,
+                            radius = 22.dp,
+                            intensity = if (glow && state.hasQueue) 1f else 0f
+                        )
                 ) {
                     Icon(
                         if (state.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,

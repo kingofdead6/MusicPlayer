@@ -35,14 +35,16 @@ fails you get a readable error and the rest of the app is untouched.
 
    ```properties
    sdk.dir=/path/to/Android/sdk
-   LLM_BASE_URL=https://api.modelarts-maas.com/v1
+   LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
    LLM_API_KEY=...
-   LLM_MODEL=GLM-5.1
+   LLM_MODEL=gemini-2.5-flash
    ```
 
    `local.properties` is git-ignored. The three `LLM_*` keys reach the app through
    `BuildConfig` and are read in `LlmConfig.fromBuildConfig()`. The client appends
-   `/chat/completions` to the base URL itself — set the base URL up to and including `/v1`.
+   `/chat/completions` to the base URL itself, so set the base URL without that suffix.
+   Any OpenAI-compatible provider works; the app ships pointed at Google Gemini, whose
+   key comes from https://aistudio.google.com/apikey
 
    Leave the `LLM_*` keys out and everything except the AI tab still works; that tab says so.
 

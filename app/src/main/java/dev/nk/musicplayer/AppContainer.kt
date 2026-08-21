@@ -10,6 +10,7 @@ import dev.nk.musicplayer.data.llm.LlmClient
 import dev.nk.musicplayer.data.llm.LlmConfig
 import dev.nk.musicplayer.data.playlist.M3uExporter
 import dev.nk.musicplayer.data.playlist.PlaylistRepository
+import dev.nk.musicplayer.data.settings.SettingsStore
 import dev.nk.musicplayer.playback.PlayerConnection
 import dev.nk.musicplayer.data.stats.StatsRepository
 import dev.nk.musicplayer.playback.QueueStore
@@ -49,6 +50,9 @@ class AppContainer(private val context: Context) {
     }
 
     val queueStore: QueueStore by lazy { QueueStore(context) }
+
+    /** Appearance choices; read by the theme at the very top of the UI tree. */
+    val settingsStore: SettingsStore by lazy { SettingsStore(context) }
 
     /** Shared by the whole UI; connected while an Activity is started. */
     val playerConnection: PlayerConnection by lazy { PlayerConnection(context) }

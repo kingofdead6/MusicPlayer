@@ -1,59 +1,69 @@
 package dev.nk.musicplayer.ui.theme
 
 import android.app.Activity
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
-import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-private val DarkColors = darkColorScheme(
-    primary = Color(0xFF7AC7FF),
-    onPrimary = Color(0xFF00344F),
-    primaryContainer = Color(0xFF004B70),
-    onPrimaryContainer = Color(0xFFCAE6FF),
-    secondary = Color(0xFFB6C9D8),
-    background = Color(0xFF101014),
-    onBackground = Color(0xFFE3E2E6),
-    surface = Color(0xFF101014),
-    onSurface = Color(0xFFE3E2E6),
-    surfaceVariant = Color(0xFF23252B),
-    onSurfaceVariant = Color(0xFFC2C7CF),
-    error = Color(0xFFFFB4AB)
-)
-
-private val LightColors = lightColorScheme(
-    primary = Color(0xFF00658F),
-    background = Color(0xFFFCFCFF),
-    surface = Color(0xFFFCFCFF)
-)
-
 /**
- * Dark by default: [darkTheme] follows the system, but the launch theme and colour choices
- * are tuned for dark, which is what this app is used in.
+ * Neon-dark by default. The theme is an explicit user choice rather than a system-dark
+ * follow: five of the six palettes only make sense dark, so tracking the system setting
+ * would just flip people out of a theme they picked on purpose.
+ *
+ * Colour changes are animated so switching themes in Settings washes across the app instead
+ * of snapping — the palette swap is the one moment the design shows itself off.
  */
 @Composable
 fun MusicPlayerTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    theme: AppTheme = AppTheme.NeonCyan,
+    glowEnabled: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColors else LightColors
+    val target = theme.colorScheme()
+    val spec = tween<androidx.compose.ui.graphics.Color>(durationMillis = 420)
+
+    val background by animateColorAsState(target.background, spec, label = "background")
+    val surface by animateColorAsState(target.surface, spec, label = "surface")
+    val surfaceVariant by animateColorAsState(target.surfaceVariant, spec, label = "surfaceVariant")
+    val primary by animateColorAsState(target.primary, spec, label = "primary")
+    val secondary by animateColorAsState(target.secondary, spec, label = "secondary")
+    val onSurface by animateColorAsState(target.onSurface, spec, label = "onSurface")
+
+    val colorScheme = target.copy(
+        background = background,
+        surface = surface,
+        surfaceVariant = surfaceVariant,
+        primary = primary,
+        secondary = secondary,
+        onSurface = onSurface,
+        onBackground = onSurface
+    )
+
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = colorScheme.background.toArgb()
-            window.navigationBarColor = colorScheme.background.toArgb()
+            // Transparent bars let the ambient light run edge to edge under them.
+            window.statusBarColor = android.graphics.Color.TRANSPARENT
+            window.navigationBarColor = android.graphics.Color.TRANSPARENT
             WindowCompat.getInsetsController(window, view).apply {
-                isAppearanceLightStatusBars = !darkTheme
-                isAppearanceLightNavigationBars = !darkTheme
+                isAppearanceLightStatusBars = theme.isLight
+                isAppearanceLightNavigationBars = theme.isLight
             }
         }
     }
-    MaterialTheme(colorScheme = colorScheme, content = content)
+
+    // Glow is meaningless on white: force it off for the light theme regardless of the toggle.
+    ProvideGlow(
+        enabled = glowEnabled && !theme.isLight,
+        accents = NeonAccents(target.primary, target.secondary)
+    ) {
+        MaterialTheme(colorScheme = colorScheme, content = content)
+    }
 }

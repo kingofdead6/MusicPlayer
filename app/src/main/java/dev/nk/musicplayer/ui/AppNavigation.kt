@@ -9,9 +9,12 @@ import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Insights
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.PlaylistPlay
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -19,6 +22,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -47,12 +51,15 @@ import dev.nk.musicplayer.ui.playlists.PlaylistDetailScreen
 import dev.nk.musicplayer.ui.playlists.PlaylistsScreen
 import dev.nk.musicplayer.ui.stats.StatsScreen
 import dev.nk.musicplayer.ui.stats.StatsViewModel
+import dev.nk.musicplayer.ui.settings.SettingsScreen
+import dev.nk.musicplayer.ui.theme.neonEdge
 
 object Routes {
     const val LIBRARY = "library"
     const val PLAYLISTS = "playlists"
     const val AI = "ai"
     const val STATS = "stats"
+    const val SETTINGS = "settings"
     const val ARTIST = "artist/{artist}"
     const val ALBUM = "album/{albumId}"
     const val PLAYLIST = "playlist/{playlistId}"
@@ -64,11 +71,16 @@ object Routes {
     fun playlist(id: Long) = "playlist/$id"
 }
 
+/**
+ * Five tabs is Material's practical ceiling for a bottom bar, so the two longest labels are
+ * abbreviated rather than left to ellipsize on narrow screens.
+ */
 private enum class TopLevel(val route: String, val label: String, val icon: ImageVector) {
     Library(Routes.LIBRARY, "Library", Icons.Rounded.LibraryMusic),
-    Playlists(Routes.PLAYLISTS, "Playlists", Icons.Rounded.PlaylistPlay),
+    Playlists(Routes.PLAYLISTS, "Lists", Icons.Rounded.PlaylistPlay),
     Ai(Routes.AI, "AI", Icons.Rounded.AutoAwesome),
-    Stats(Routes.STATS, "Stats", Icons.Rounded.Insights)
+    Stats(Routes.STATS, "Stats", Icons.Rounded.Insights),
+    Settings(Routes.SETTINGS, "Theme", Icons.Rounded.Settings)
 }
 
 /** Routes that own the full screen and therefore hide the mini player and the tab bar. */
@@ -139,6 +151,9 @@ fun AppNavigation(modifier: Modifier = Modifier) {
                     viewModel = statsViewModel,
                     contentPadding = PaddingValues(bottom = 8.dp)
                 )
+            }
+            composable(Routes.SETTINGS) {
+                SettingsScreen(contentPadding = PaddingValues(bottom = 8.dp))
             }
             composable(
                 route = Routes.ARTIST,
@@ -212,7 +227,13 @@ fun AppNavigation(modifier: Modifier = Modifier) {
         }
 
         if (!fullScreen) {
-            NavigationBar {
+            NavigationBar(
+                containerColor = MaterialTheme.colorScheme.surface,
+                modifier = Modifier.neonEdge(
+                    shape = RectangleShape,
+                    alpha = 0.22f
+                )
+            ) {
                 TopLevel.entries.forEach { tab ->
                     NavigationBarItem(
                         selected = currentRoute == tab.route,
@@ -224,7 +245,14 @@ fun AppNavigation(modifier: Modifier = Modifier) {
                             }
                         },
                         icon = { Icon(tab.icon, contentDescription = null) },
-                        label = { Text(tab.label) }
+                        label = { Text(tab.label) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     )
                 }
             }

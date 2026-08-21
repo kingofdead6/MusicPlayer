@@ -1,5 +1,10 @@
 package dev.nk.musicplayer.ui.components
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -18,11 +23,15 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.nk.musicplayer.playback.PlayerUiState
+import dev.nk.musicplayer.ui.theme.LocalGlowEnabled
+import dev.nk.musicplayer.ui.theme.neonEdge
 
 @Composable
 fun MiniPlayer(
@@ -33,10 +42,25 @@ fun MiniPlayer(
     modifier: Modifier = Modifier
 ) {
     val track = state.current ?: return
+    val scheme = MaterialTheme.colorScheme
+    val glow = LocalGlowEnabled.current
+
+    // While playing, the top edge breathes: a slow alpha ramp on the accent line. It is the
+    // one always-visible piece of chrome, so it doubles as the "is it playing" indicator.
+    val transition = rememberInfiniteTransition(label = "miniPulse")
+    val pulse by transition.animateFloat(
+        initialValue = 0.45f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(1600), RepeatMode.Reverse),
+        label = "pulse"
+    )
+    val edgeAlpha = if (glow && state.isPlaying) pulse else 0.35f
+
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .background(scheme.surface)
+            .neonEdge(RectangleShape, scheme.primary, alpha = edgeAlpha * 0.5f)
             .clickable(onClick = onClick)
     ) {
         LinearProgressIndicator(
@@ -45,6 +69,8 @@ fun MiniPlayer(
                     (state.positionMs.toFloat() / state.durationMs).coerceIn(0f, 1f)
                 } else 0f
             },
+            color = scheme.primary,
+            trackColor = scheme.surfaceVariant,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(2.dp)
@@ -78,7 +104,8 @@ fun MiniPlayer(
             IconButton(onClick = onTogglePlayPause) {
                 Icon(
                     if (state.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                    contentDescription = if (state.isPlaying) "Pause" else "Play"
+                    contentDescription = if (state.isPlaying) "Pause" else "Play",
+                    tint = scheme.primary
                 )
             }
             IconButton(onClick = onNext) {

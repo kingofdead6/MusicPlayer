@@ -4,7 +4,8 @@ sdk.dir=/path/to/Android/sdk
 
 # OpenAI-compatible chat-completions endpoint used for AI playlist generation.
 # Base URL only — the client appends /chat/completions itself.
-# Huawei ModelArts (GLM) example:
-LLM_BASE_URL=https://api.modelarts-maas.com/v1
+# Google Gemini exposes an OpenAI-compatible endpoint; get a key at
+# https://aistudio.google.com/apikey
+LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
 LLM_API_KEY=put-your-key-here
-LLM_MODEL=GLM-5.1
+LLM_MODEL=gemini-2.5-flash
