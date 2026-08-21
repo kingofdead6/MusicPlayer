@@ -4,10 +4,10 @@ export const APP = {
   tagline: "Your library. Your phone. Your playlists.",
   repo: "https://github.com/kingofdead6/MusicPlayer",
   // Point this at a published release asset once you cut one.
-  apk: "https://github.com/kingofdead6/MusicPlayer/releases/latest",
+  apk: "https://music-birds-app.vercel.app/MusicBirds.apk",
   version: "1.0",
   minAndroid: "8.0 (API 26)",
-  size: "~12 MB",
+  size: "~22 MB",
 };
 
 export const FEATURES = [
