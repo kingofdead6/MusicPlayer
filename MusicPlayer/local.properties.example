@@ -2,10 +2,12 @@
 # Android SDK location (set by Android Studio automatically).
 sdk.dir=/path/to/Android/sdk
 
-# OpenAI-compatible chat-completions endpoint used for AI playlist generation.
-# Base URL only — the client appends /chat/completions itself.
-# Google Gemini exposes an OpenAI-compatible endpoint; get a key at
-# https://aistudio.google.com/apikey
-LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
-LLM_API_KEY=put-your-key-here
-LLM_MODEL=gemini-2.5-flash
+# The Hugging Face API key for AI playlists is entered in the app under
+# Settings -> AI Playlists. Nothing below is required.
+
+# Optional overrides for the OpenAI-compatible chat-completions endpoint. Leave them out to
+# use the Hugging Face router. Base URL only - the client appends /chat/completions itself.
+# A key entered in Settings takes precedence over LLM_API_KEY.
+#LLM_BASE_URL=https://router.huggingface.co/v1
+#LLM_API_KEY=
+#LLM_MODEL=meta-llama/Llama-3.3-70B-Instruct

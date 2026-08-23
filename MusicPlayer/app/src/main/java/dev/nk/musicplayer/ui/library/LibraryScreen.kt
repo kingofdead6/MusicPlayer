@@ -1,6 +1,11 @@
 package dev.nk.musicplayer.ui.library
 
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,8 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -40,6 +44,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -51,7 +56,12 @@ import dev.nk.musicplayer.data.db.Track
 import dev.nk.musicplayer.playback.PlaySource
 import dev.nk.musicplayer.ui.components.AlbumArt
 import dev.nk.musicplayer.ui.components.EmptyState
+import dev.nk.musicplayer.ui.components.SegmentedTabs
 import dev.nk.musicplayer.ui.components.TrackRow
+import dev.nk.musicplayer.ui.theme.AppShapes
+import dev.nk.musicplayer.ui.theme.Motion
+import dev.nk.musicplayer.ui.theme.accentSurface
+import dev.nk.musicplayer.ui.theme.pressable
 import kotlinx.coroutines.launch
 
 private enum class LibraryTab(val label: String) { Songs("Songs"), Artists("Artists"), Albums("Albums") }
@@ -74,30 +84,45 @@ fun LibraryScreen(
     val lastScan by viewModel.lastScan.collectAsStateWithLifecycle()
 
     Column(modifier = modifier.fillMaxSize()) {
+        // A pill search field with the border suppressed: at this radius a visible outline
+        // reads as a hard capsule outline rather than as a soft input, so the fill carries
+        // the shape instead.
         OutlinedTextField(
             value = query,
             onValueChange = viewModel::setQuery,
             placeholder = { Text("Search title, artist, album") },
             leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
             trailingIcon = {
-                if (query.isNotEmpty()) {
+                AnimatedVisibility(
+                    visible = query.isNotEmpty(),
+                    enter = fadeIn(tween(Motion.Quick)) + scaleIn(Motion.springy()),
+                    exit = fadeOut(tween(Motion.Quick)) + scaleOut(tween(Motion.Quick))
+                ) {
                     IconButton(onClick = { viewModel.setQuery("") }) {
                         Icon(Icons.Rounded.Clear, contentDescription = "Clear search")
                     }
                 }
             },
             singleLine = true,
+            shape = AppShapes.pill,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                unfocusedBorderColor = Color.Transparent
+            ),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         )
 
-        TabRow(selectedTabIndex = tab) {
-            LibraryTab.entries.forEachIndexed { index, entry ->
-                Tab(selected = tab == index, onClick = { tab = index }, text = { Text(entry.label) })
-            }
-        }
+        SegmentedTabs(
+            labels = LibraryTab.entries.map { it.label },
+            selected = tab,
+            onSelect = { tab = it },
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
 
         if (lastScan != null) {
             Text(
@@ -168,7 +193,7 @@ private fun SongsTab(
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                FilledTonalButton(onClick = {
+                FilledTonalButton(shape = AppShapes.pill, onClick = {
                     scope.launch {
                         val all = viewModel.shuffleQueue()
                         if (all.isNotEmpty()) onPlay(all, 0, PlaySource.SHUFFLE)
@@ -217,12 +242,26 @@ private fun ArtistsTab(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onOpenArtist(artist.artist) }
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                    .padding(horizontal = 12.dp, vertical = 3.dp)
+                    .pressable(shape = AppShapes.large, onClick = { onOpenArtist(artist.artist) })
+                    .padding(horizontal = 10.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Rounded.Person, contentDescription = null, modifier = Modifier.size(40.dp))
-                Column(modifier = Modifier.padding(start = 12.dp)) {
+                // The initial in a lit disc gives artists the same visual weight as the album
+                // tiles beside them, instead of a bare glyph floating in the row.
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .accentSurface(shape = AppShapes.pill, alpha = 0.12f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = artist.artist.take(1).uppercase(),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Column(modifier = Modifier.padding(start = 14.dp)) {
                     Text(artist.artist, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
                         "${artist.trackCount} tracks · ${artist.albumCount} albums",
@@ -251,12 +290,13 @@ private fun AlbumsTab(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onOpenAlbum(album.albumId) }
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = 12.dp, vertical = 3.dp)
+                    .pressable(shape = AppShapes.large, onClick = { onOpenAlbum(album.albumId) })
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                AlbumArt(albumId = album.albumId, modifier = Modifier.size(48.dp))
-                Column(modifier = Modifier.padding(start = 12.dp)) {
+                AlbumArt(albumId = album.albumId, modifier = Modifier.size(52.dp))
+                Column(modifier = Modifier.padding(start = 14.dp)) {
                     Text(album.album, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
                         "${album.artist} · ${album.trackCount} tracks",

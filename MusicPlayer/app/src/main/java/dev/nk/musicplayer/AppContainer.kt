@@ -44,9 +44,15 @@ class AppContainer(private val context: Context) {
 
     val statsRepository: StatsRepository by lazy { StatsRepository(database.playEventDao()) }
 
-    /** The only part of the app that touches the network. */
+    /**
+     * The only part of the app that touches the network. The API key is read from
+     * [settingsStore] on each call, so a key entered in Settings works without a restart.
+     */
     val aiPlaylistGenerator: AiPlaylistGenerator by lazy {
-        AiPlaylistGenerator(libraryRepository, LlmClient(LlmConfig.fromBuildConfig()))
+        AiPlaylistGenerator(
+            libraryRepository,
+            LlmClient { LlmConfig.forUserKey(settingsStore.hfApiKey.value) }
+        )
     }
 
     val queueStore: QueueStore by lazy { QueueStore(context) }

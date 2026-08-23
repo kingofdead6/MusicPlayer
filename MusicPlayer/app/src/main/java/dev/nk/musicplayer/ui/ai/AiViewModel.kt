@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import dev.nk.musicplayer.data.db.Track
 import dev.nk.musicplayer.data.llm.AiPlaylistGenerator
 import dev.nk.musicplayer.data.playlist.PlaylistRepository
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -43,11 +44,20 @@ data class AiUiState(
 
 class AiViewModel(
     private val generator: AiPlaylistGenerator,
-    private val playlists: PlaylistRepository
+    private val playlists: PlaylistRepository,
+    apiKey: Flow<String>
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(AiUiState(configured = generator.isConfigured))
     val state = _state.asStateFlow()
+
+    init {
+        // The key is edited in Settings while this ViewModel is alive, so the banner and the
+        // Generate button have to follow it rather than a value read once at construction.
+        viewModelScope.launch {
+            apiKey.collect { _state.update { s -> s.copy(configured = generator.isConfigured) } }
+        }
+    }
 
     fun setPrompt(value: String) = _state.update { it.copy(prompt = value) }
 
@@ -103,7 +113,10 @@ class AiViewModel(
     fun dismissError() = _state.update { it.copy(error = null) }
 
     companion object {
-        fun factory(generator: AiPlaylistGenerator, playlists: PlaylistRepository) =
-            viewModelFactory { initializer { AiViewModel(generator, playlists) } }
+        fun factory(
+            generator: AiPlaylistGenerator,
+            playlists: PlaylistRepository,
+            apiKey: Flow<String>
+        ) = viewModelFactory { initializer { AiViewModel(generator, playlists, apiKey) } }
     }
 }

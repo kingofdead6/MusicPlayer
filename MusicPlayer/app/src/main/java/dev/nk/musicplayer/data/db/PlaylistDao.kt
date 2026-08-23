@@ -57,12 +57,28 @@ interface PlaylistDao {
     )
     suspend fun tracks(playlistId: Long): List<Track>
 
+    /**
+     * Playlist rows for the list screen, including the cover art ids.
+     *
+     * The cover is the first track *in playlist order*, which the aggregate itself cannot
+     * give us — `MIN(position)` and an arbitrary `t.id` from the same GROUP BY would not be
+     * guaranteed to come from the same row. The two correlated subqueries pick the track at
+     * the lowest position explicitly, and yield NULL for an empty playlist.
+     */
     @Query(
         """
         SELECT p.id AS id, p.name AS name, p.createdAt AS createdAt,
                p.isAiGenerated AS isAiGenerated, p.sourcePrompt AS sourcePrompt,
                COUNT(t.id) AS trackCount,
-               COALESCE(SUM(t.durationMs), 0) AS totalDurationMs
+               COALESCE(SUM(t.durationMs), 0) AS totalDurationMs,
+               (SELECT ct.id FROM playlist_tracks cpt
+                  JOIN tracks ct ON ct.id = cpt.trackId
+                  WHERE cpt.playlistId = p.id
+                  ORDER BY cpt.position LIMIT 1) AS coverTrackId,
+               (SELECT ct.albumId FROM playlist_tracks cpt
+                  JOIN tracks ct ON ct.id = cpt.trackId
+                  WHERE cpt.playlistId = p.id
+                  ORDER BY cpt.position LIMIT 1) AS coverAlbumId
         FROM playlists p
         LEFT JOIN playlist_tracks pt ON pt.playlistId = p.id
         LEFT JOIN tracks t ON t.id = pt.trackId

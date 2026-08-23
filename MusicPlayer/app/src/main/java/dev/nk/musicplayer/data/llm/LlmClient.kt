@@ -16,8 +16,10 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 /**
- * Endpoint settings. They come from `local.properties` via BuildConfig, so nothing about the
- * provider is baked into the code beyond the OpenAI-compatible wire format.
+ * Endpoint settings. The API key is entered by the user in Settings; the base URL and model
+ * still come from `local.properties` via BuildConfig when a build wants to point somewhere
+ * else, otherwise they fall back to the Hugging Face router. Nothing about the provider is
+ * baked into the code beyond the OpenAI-compatible wire format.
  */
 data class LlmConfig(
     val baseUrl: String,
@@ -32,10 +34,18 @@ data class LlmConfig(
         get() = baseUrl.trimEnd('/') + "/chat/completions"
 
     companion object {
-        fun fromBuildConfig() = LlmConfig(
-            baseUrl = BuildConfig.LLM_BASE_URL,
-            apiKey = BuildConfig.LLM_API_KEY,
-            model = BuildConfig.LLM_MODEL
+        /** Hugging Face's OpenAI-compatible inference router. */
+        const val HF_BASE_URL = "https://router.huggingface.co/v1"
+        const val HF_DEFAULT_MODEL = "meta-llama/Llama-3.3-70B-Instruct"
+
+        /**
+         * The user's key wins over anything baked into the build, so entering one in Settings
+         * always takes effect. Base URL and model keep their BuildConfig values when set.
+         */
+        fun forUserKey(userKey: String) = LlmConfig(
+            baseUrl = BuildConfig.LLM_BASE_URL.ifBlank { HF_BASE_URL },
+            apiKey = userKey.ifBlank { BuildConfig.LLM_API_KEY },
+            model = BuildConfig.LLM_MODEL.ifBlank { HF_DEFAULT_MODEL }
         )
     }
 }
@@ -58,7 +68,11 @@ private data class ChatResponse(val choices: List<Choice> = emptyList())
 @Serializable
 private data class Choice(val message: ChatMessage? = null)
 
-class LlmClient(private val config: LlmConfig) {
+/**
+ * [configProvider] is re-read on every call rather than captured once: the user can paste a
+ * key into Settings while the app is running and the very next generation must use it.
+ */
+class LlmClient(private val configProvider: () -> LlmConfig) {
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
@@ -70,14 +84,14 @@ class LlmClient(private val config: LlmConfig) {
         .callTimeout(90, TimeUnit.SECONDS)
         .build()
 
-    val isConfigured: Boolean get() = config.isConfigured
+    val isConfigured: Boolean get() = configProvider().isConfigured
 
     suspend fun chat(messages: List<ChatMessage>): Result<String> = withContext(Dispatchers.IO) {
+        val config = configProvider()
         if (!config.isConfigured) {
             return@withContext Result.failure(
                 LlmFailureException(
-                    "No model configured. Set LLM_BASE_URL, LLM_API_KEY and LLM_MODEL in " +
-                        "local.properties and rebuild."
+                    "No Hugging Face API key set. Add one in Settings to turn on AI playlists."
                 )
             )
         }
@@ -103,9 +117,14 @@ class LlmClient(private val config: LlmConfig) {
                 val body = response.body?.string().orEmpty()
                 if (!response.isSuccessful) {
                     Log.w(TAG, "LLM HTTP ${response.code}: ${body.take(500)}")
-                    return@withContext Result.failure(
-                        LlmFailureException("The model returned HTTP ${response.code}.")
-                    )
+                    // 401/403 is almost always a bad or expired token, so point at Settings.
+                    val message = if (response.code == 401 || response.code == 403) {
+                        "Hugging Face rejected the API key (HTTP ${response.code}). " +
+                            "Check it in Settings."
+                    } else {
+                        "The model returned HTTP ${response.code}."
+                    }
+                    return@withContext Result.failure(LlmFailureException(message))
                 }
                 val content = json.decodeFromString<ChatResponse>(body)
                     .choices.firstOrNull()?.message?.content

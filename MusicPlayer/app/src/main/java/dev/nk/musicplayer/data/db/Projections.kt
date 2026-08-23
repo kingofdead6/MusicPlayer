@@ -41,7 +41,14 @@ data class PlaylistSummary(
     val isAiGenerated: Boolean,
     val sourcePrompt: String?,
     val trackCount: Int,
-    val totalDurationMs: Long
+    val totalDurationMs: Long,
+    /**
+     * The playlist's cover: the first track in playlist order. Both ids are carried because
+     * artwork resolution prefers the track over the album — see `TrackArtworkFetcher`.
+     * Null for an empty playlist, which has nothing to draw.
+     */
+    val coverTrackId: Long?,
+    val coverAlbumId: Long?
 )
 
 data class AiPlaylistCompletion(

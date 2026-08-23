@@ -33,7 +33,13 @@ import androidx.compose.ui.unit.dp
 import dev.nk.musicplayer.data.db.Track
 import dev.nk.musicplayer.playback.PlaySource
 import dev.nk.musicplayer.ui.components.AlbumArt
+import dev.nk.musicplayer.ui.components.TrackArtwork
+import dev.nk.musicplayer.ui.components.albumArtwork
 import dev.nk.musicplayer.ui.components.TrackRow
+import dev.nk.musicplayer.ui.theme.AppShapes
+import dev.nk.musicplayer.ui.theme.Radii
+import dev.nk.musicplayer.ui.theme.accentGlow
+import dev.nk.musicplayer.ui.theme.softSurface
 import dev.nk.musicplayer.util.formatDurationLong
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -124,22 +130,33 @@ private fun TrackListDetail(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .padding(16.dp)
+                        .softSurface(shape = AppShapes.xlarge)
                         .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (artworkAlbumId != null) {
-                        AlbumArt(albumId = artworkAlbumId, modifier = Modifier.size(88.dp))
+                    val headerArt = tracks.firstOrNull()?.let(TrackArtwork::of)
+                        ?: artworkAlbumId?.let(::albumArtwork)
+                    if (headerArt != null) {
+                        AlbumArt(
+                            artwork = headerArt,
+                            corner = Radii.large,
+                            modifier = Modifier
+                                .size(92.dp)
+                                .accentGlow(cornerRadius = Radii.large, radius = 18.dp, intensity = 0.5f)
+                        )
                     }
                     Column(
                         modifier = Modifier.padding(start = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Text(subtitle, style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             FilledTonalButton(
                                 onClick = { if (tracks.isNotEmpty()) onPlay(tracks, 0, PlaySource.LIBRARY) },
-                                enabled = tracks.isNotEmpty()
+                                enabled = tracks.isNotEmpty(),
+                                shape = AppShapes.pill
                             ) {
                                 Icon(Icons.Rounded.PlayArrow, contentDescription = null,
                                     modifier = Modifier.size(18.dp))
@@ -149,7 +166,8 @@ private fun TrackListDetail(
                                 onClick = {
                                     if (tracks.isNotEmpty()) onPlay(tracks.shuffled(), 0, PlaySource.SHUFFLE)
                                 },
-                                enabled = tracks.isNotEmpty()
+                                enabled = tracks.isNotEmpty(),
+                                shape = AppShapes.pill
                             ) {
                                 Icon(Icons.Rounded.Shuffle, contentDescription = null,
                                     modifier = Modifier.size(18.dp))

@@ -1,6 +1,5 @@
 package dev.nk.musicplayer.ui.components
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,6 +30,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.nk.musicplayer.LocalContainer
 import dev.nk.musicplayer.data.db.Track
+import dev.nk.musicplayer.ui.theme.AppShapes
+import dev.nk.musicplayer.ui.theme.pressable
 import kotlinx.coroutines.launch
 
 /**
@@ -51,7 +52,11 @@ fun TrackActionsSheet(
     var choosingPlaylist by remember { mutableStateOf(false) }
     var creatingPlaylist by remember { mutableStateOf(false) }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        shape = AppShapes.bottomDock,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
         Column(modifier = Modifier.padding(bottom = 24.dp)) {
             Text(
                 text = track.title,
@@ -120,8 +125,9 @@ private fun SheetRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 24.dp, vertical = 14.dp),
+            .padding(horizontal = 12.dp, vertical = 2.dp)
+            .pressable(shape = AppShapes.large, onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)

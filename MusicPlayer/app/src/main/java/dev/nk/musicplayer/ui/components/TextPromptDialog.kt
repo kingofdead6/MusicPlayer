@@ -9,6 +9,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import dev.nk.musicplayer.ui.theme.AppShapes
 
 /** One-field dialog, used for creating and renaming playlists. */
 @Composable
@@ -23,20 +24,28 @@ fun TextPromptDialog(
     var value by remember { mutableStateOf(initialValue) }
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = AppShapes.huge,
         title = { Text(title) },
         text = {
             OutlinedTextField(
                 value = value,
                 onValueChange = { value = it },
                 label = { Text(label) },
-                singleLine = true
+                singleLine = true,
+                shape = AppShapes.large
             )
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(value) }, enabled = value.isNotBlank()) {
+            TextButton(
+                onClick = { onConfirm(value) },
+                enabled = value.isNotBlank(),
+                shape = AppShapes.pill
+            ) {
                 Text(confirmLabel)
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        dismissButton = {
+            TextButton(onClick = onDismiss, shape = AppShapes.pill) { Text("Cancel") }
+        }
     )
 }

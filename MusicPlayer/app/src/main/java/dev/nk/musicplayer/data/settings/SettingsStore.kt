@@ -31,6 +31,14 @@ class SettingsStore(context: Context) {
     private val _seekBarStyle = MutableStateFlow(readSeekBarStyle())
     val seekBarStyle: StateFlow<SeekBarStyle> = _seekBarStyle.asStateFlow()
 
+    /**
+     * Hugging Face access token for AI playlists. Entered by the user in Settings rather than
+     * baked in at build time, so a plain install can turn the feature on without a rebuild.
+     * Empty means "not configured" and the AI screen says so.
+     */
+    private val _hfApiKey = MutableStateFlow(prefs.getString(KEY_HF_KEY, null).orEmpty())
+    val hfApiKey: StateFlow<String> = _hfApiKey.asStateFlow()
+
     /** Unknown or removed theme names fall back to the default rather than crashing. */
     private fun readTheme(): AppTheme {
         val stored = prefs.getString(KEY_THEME, null) ?: return AppTheme.NeonCyan
@@ -62,10 +70,18 @@ class SettingsStore(context: Context) {
         prefs.edit { putBoolean(KEY_PULSE, enabled) }
     }
 
+    /** Stray whitespace from a paste would break the Authorization header, so trim it here. */
+    fun setHfApiKey(key: String) {
+        val cleaned = key.trim()
+        _hfApiKey.value = cleaned
+        prefs.edit { putString(KEY_HF_KEY, cleaned) }
+    }
+
     private companion object {
         const val KEY_THEME = "theme"
         const val KEY_GLOW = "glow_enabled"
         const val KEY_PULSE = "pulse_with_playback"
         const val KEY_SEEK = "seek_bar_style"
+        const val KEY_HF_KEY = "hf_api_key"
     }
 }

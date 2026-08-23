@@ -26,7 +26,10 @@ fun MusicPlayerTheme(
     content: @Composable () -> Unit
 ) {
     val target = theme.colorScheme()
-    val spec = tween<androidx.compose.ui.graphics.Color>(durationMillis = 420)
+    val spec = tween<androidx.compose.ui.graphics.Color>(
+        durationMillis = Motion.Slow,
+        easing = Motion.Emphasized
+    )
 
     val background by animateColorAsState(target.background, spec, label = "background")
     val surface by animateColorAsState(target.surface, spec, label = "surface")
@@ -64,6 +67,8 @@ fun MusicPlayerTheme(
         enabled = glowEnabled && !theme.isLight,
         accents = NeonAccents(target.primary, target.secondary)
     ) {
-        MaterialTheme(colorScheme = colorScheme, content = content)
+        // Shapes are provided here rather than per-component so every stock Material
+        // surface the app never touches by hand still lands on the rounded scale.
+        MaterialTheme(colorScheme = colorScheme, shapes = MusicShapes, content = content)
     }
 }

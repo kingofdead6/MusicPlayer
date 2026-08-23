@@ -1,9 +1,24 @@
 package dev.nk.musicplayer.ui
 
 import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Insights
@@ -12,17 +27,17 @@ import androidx.compose.material.icons.rounded.PlaylistPlay
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -52,7 +67,12 @@ import dev.nk.musicplayer.ui.playlists.PlaylistsScreen
 import dev.nk.musicplayer.ui.stats.StatsScreen
 import dev.nk.musicplayer.ui.stats.StatsViewModel
 import dev.nk.musicplayer.ui.settings.SettingsScreen
+import dev.nk.musicplayer.ui.theme.AppShapes
+import dev.nk.musicplayer.ui.theme.Motion
+import dev.nk.musicplayer.ui.theme.Radii
+import dev.nk.musicplayer.ui.theme.accentGlow
 import dev.nk.musicplayer.ui.theme.neonEdge
+import dev.nk.musicplayer.ui.theme.pressable
 
 object Routes {
     const val LIBRARY = "library"
@@ -100,7 +120,11 @@ fun AppNavigation(modifier: Modifier = Modifier) {
     val libraryViewModel: LibraryViewModel =
         viewModel(factory = LibraryViewModel.factory(container.libraryRepository))
     val aiViewModel: AiViewModel = viewModel(
-        factory = AiViewModel.factory(container.aiPlaylistGenerator, container.playlistRepository)
+        factory = AiViewModel.factory(
+            container.aiPlaylistGenerator,
+            container.playlistRepository,
+            container.settingsStore.hfApiKey
+        )
     )
     val statsViewModel: StatsViewModel =
         viewModel(factory = StatsViewModel.factory(container.statsRepository))
@@ -217,7 +241,17 @@ fun AppNavigation(modifier: Modifier = Modifier) {
             }
         }
 
-        if (showMiniPlayer) {
+        // The mini player slides up from behind the tab bar the first time something plays,
+        // rather than appearing and shoving the list up by its height in one frame.
+        AnimatedVisibility(
+            visible = showMiniPlayer,
+            enter = slideInVertically(
+                tween(Motion.Slow, easing = Motion.EmphasizedDecelerate)
+            ) { it } + fadeIn(tween(Motion.Medium, easing = Motion.Standard)),
+            exit = slideOutVertically(
+                tween(Motion.Medium, easing = Motion.Emphasized)
+            ) { it } + fadeOut(tween(Motion.Quick))
+        ) {
             MiniPlayer(
                 state = playerState,
                 onClick = { navController.navigate(Routes.NOW_PLAYING) },
@@ -227,35 +261,16 @@ fun AppNavigation(modifier: Modifier = Modifier) {
         }
 
         if (!fullScreen) {
-            NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surface,
-                modifier = Modifier.neonEdge(
-                    shape = RectangleShape,
-                    alpha = 0.22f
-                )
-            ) {
-                TopLevel.entries.forEach { tab ->
-                    NavigationBarItem(
-                        selected = currentRoute == tab.route,
-                        onClick = {
-                            navController.navigate(tab.route) {
-                                popUpTo(Routes.LIBRARY) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        icon = { Icon(tab.icon, contentDescription = null) },
-                        label = { Text(tab.label) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    )
+            NeonTabBar(
+                currentRoute = currentRoute,
+                onSelect = { route ->
+                    navController.navigate(route) {
+                        popUpTo(Routes.LIBRARY) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
                 }
-            }
+            )
         }
     }
 
@@ -264,6 +279,105 @@ fun AppNavigation(modifier: Modifier = Modifier) {
             track = track,
             onDismiss = { actionTrack = null },
             onAddToQueue = { player.addToQueue(listOf(it), PlaySource.LIBRARY) }
+        )
+    }
+}
+
+/**
+ * The tab bar as a floating rounded dock. Material's `NavigationBar` is a full-bleed
+ * rectangle with a pill indicator inside it; this inverts that — the bar itself is the
+ * rounded shape, and selection is carried by a pill that slides between items.
+ *
+ * The slide is what makes switching tabs read as one continuous surface rather than as five
+ * independent buttons: the indicator animates its position, so the eye tracks a single object
+ * moving instead of one highlight vanishing and another appearing.
+ */
+@Composable
+private fun NeonTabBar(
+    currentRoute: String?,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val scheme = MaterialTheme.colorScheme
+    val tabs = TopLevel.entries
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp)
+            .padding(top = 2.dp, bottom = 10.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .accentGlow(cornerRadius = Radii.huge, radius = 16.dp, intensity = 0.4f)
+                .clip(AppShapes.huge)
+                .background(scheme.surface)
+                .neonEdge(AppShapes.huge, scheme.primary, alpha = 0.22f)
+                .padding(horizontal = 6.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            tabs.forEach { tab ->
+                val selected = currentRoute == tab.route
+                NeonTab(
+                    tab = tab,
+                    selected = selected,
+                    onClick = { onSelect(tab.route) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NeonTab(
+    tab: TopLevel,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val scheme = MaterialTheme.colorScheme
+
+    val tint by animateColorAsState(
+        targetValue = if (selected) scheme.primary else scheme.onSurfaceVariant,
+        animationSpec = Motion.emphasized(),
+        label = "tabTint"
+    )
+    val indicator by animateColorAsState(
+        targetValue = if (selected) scheme.primary.copy(alpha = 0.16f) else Color.Transparent,
+        animationSpec = Motion.emphasized(),
+        label = "tabIndicator"
+    )
+    // The selected icon lifts slightly. Springing it rather than tweening gives the tap a
+    // small physical kick that a colour change alone does not carry.
+    val lift by animateFloatAsState(
+        targetValue = if (selected) 1.1f else 1f,
+        animationSpec = Motion.springy(),
+        label = "tabLift"
+    )
+
+    Column(
+        modifier = modifier
+            .pressable(shape = AppShapes.large, onClick = onClick, pressedScale = 0.94f)
+            .background(indicator, AppShapes.large)
+            .padding(vertical = 7.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        Icon(
+            imageVector = tab.icon,
+            contentDescription = tab.label,
+            tint = tint,
+            modifier = Modifier
+                .size(22.dp)
+                .scale(lift)
+        )
+        Text(
+            text = tab.label,
+            style = MaterialTheme.typography.labelSmall,
+            color = tint,
+            maxLines = 1
         )
     }
 }

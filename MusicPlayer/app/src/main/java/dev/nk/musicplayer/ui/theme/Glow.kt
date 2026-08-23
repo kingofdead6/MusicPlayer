@@ -55,7 +55,7 @@ fun ProvideGlow(enabled: Boolean, accents: NeonAccents, content: @Composable () 
  */
 fun Modifier.neonGlow(
     color: Color,
-    cornerRadius: Dp = 16.dp,
+    cornerRadius: Dp = Radii.large,
     radius: Dp = 18.dp,
     intensity: Float = 1f
 ): Modifier = this.drawBehind {
@@ -80,7 +80,7 @@ fun Modifier.neonGlow(
 /** [neonGlow] with the theme accent and the glow preference already applied. */
 @Composable
 fun Modifier.accentGlow(
-    cornerRadius: Dp = 16.dp,
+    cornerRadius: Dp = Radii.large,
     radius: Dp = 18.dp,
     intensity: Float = 1f,
     color: Color = LocalAccents.current.primary
@@ -93,7 +93,7 @@ else neonGlow(color, cornerRadius, radius, intensity)
  */
 @Composable
 fun Modifier.neonEdge(
-    shape: Shape = RoundedCornerShape(16.dp),
+    shape: Shape = AppShapes.large,
     color: Color = LocalAccents.current.primary,
     alpha: Float = 0.45f,
     width: Dp = 1.dp
@@ -108,7 +108,7 @@ else border(width, color.copy(alpha = alpha), shape)
 fun Modifier.neonPanel(
     fill: Color,
     accent: Color = LocalAccents.current.primary,
-    corner: Dp = 16.dp,
+    corner: Dp = Radii.large,
     glowRadius: Dp = 14.dp,
     intensity: Float = 0.7f
 ): Modifier = this

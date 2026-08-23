@@ -1,6 +1,9 @@
 package dev.nk.musicplayer.ui.ai
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -25,21 +28,31 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.nk.musicplayer.data.db.Track
 import dev.nk.musicplayer.playback.PlaySource
+import dev.nk.musicplayer.ui.theme.AppShapes
+import dev.nk.musicplayer.ui.theme.Motion
+import dev.nk.musicplayer.ui.theme.Radii
+import dev.nk.musicplayer.ui.theme.accentGlow
+import dev.nk.musicplayer.ui.theme.accentSurface
+import dev.nk.musicplayer.ui.theme.glassPanel
+import dev.nk.musicplayer.ui.theme.pressable
+import dev.nk.musicplayer.ui.theme.softSurface
 import dev.nk.musicplayer.util.formatDuration
 import dev.nk.musicplayer.util.formatDurationLong
 
@@ -60,19 +73,32 @@ fun AiScreen(
         contentPadding = contentPadding
     ) {
         item {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .fillMaxWidth()
+                    .glassPanel(corner = Radii.xlarge, intensity = 0.45f)
+                    .padding(18.dp)
+            ) {
                 Text("Describe the playlist", style = MaterialTheme.typography.titleMedium)
                 Text(
                     "Built only from tracks already on this phone.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(14.dp))
                 OutlinedTextField(
                     value = state.prompt,
                     onValueChange = viewModel::setPrompt,
                     placeholder = { Text("e.g. traveling playlist, calm, nothing too heavy") },
                     minLines = 3,
+                    shape = AppShapes.large,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                        focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                        unfocusedBorderColor = Color.Transparent
+                    ),
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -85,16 +111,16 @@ fun AiScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     PRESETS.forEach { (minutes, label) ->
-                        FilterChip(
+                        DurationChip(
+                            label = label,
                             selected = !state.customSelected && state.presetMinutes == minutes,
-                            onClick = { viewModel.selectPreset(minutes) },
-                            label = { Text(label) }
+                            onClick = { viewModel.selectPreset(minutes) }
                         )
                     }
-                    FilterChip(
+                    DurationChip(
+                        label = "Custom",
                         selected = state.customSelected,
-                        onClick = { viewModel.selectCustom() },
-                        label = { Text("Custom") }
+                        onClick = viewModel::selectCustom
                     )
                     if (state.customSelected) {
                         OutlinedTextField(
@@ -102,16 +128,31 @@ fun AiScreen(
                             onValueChange = viewModel::setCustomMinutes,
                             label = { Text("min") },
                             singleLine = true,
-                            modifier = Modifier.width(110.dp)
+                            shape = AppShapes.pill,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                                unfocusedBorderColor = Color.Transparent
+                            ),
+                            modifier = Modifier.width(118.dp)
                         )
                     }
                 }
 
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(18.dp))
                 Button(
                     onClick = viewModel::generate,
                     enabled = state.canGenerate,
-                    modifier = Modifier.fillMaxWidth()
+                    shape = AppShapes.pill,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                        .accentGlow(
+                            cornerRadius = Radii.pill,
+                            radius = 18.dp,
+                            intensity = if (state.canGenerate) 0.8f else 0f
+                        )
                 ) {
                     if (state.loading) {
                         CircularProgressIndicator(
@@ -130,9 +171,8 @@ fun AiScreen(
                 if (!state.configured) {
                     Spacer(Modifier.height(12.dp))
                     Text(
-                        "No model configured. Add LLM_BASE_URL, LLM_API_KEY and LLM_MODEL to " +
-                            "local.properties and rebuild. Everything else in the app works " +
-                            "without it.",
+                        "No Hugging Face API key set. Open Settings and paste your token to " +
+                            "turn on AI playlists. Everything else in the app works without it.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )
@@ -141,6 +181,7 @@ fun AiScreen(
                 state.error?.let { error ->
                     Spacer(Modifier.height(12.dp))
                     Card(
+                        shape = AppShapes.large,
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.errorContainer
                         )
@@ -172,15 +213,26 @@ fun AiScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                        .padding(horizontal = 12.dp, vertical = 3.dp)
+                        .softSurface(shape = AppShapes.large)
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        "${index + 1}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.width(28.dp)
-                    )
+                    // The position sits in its own disc so the numbers form a clean column
+                    // down the left edge instead of ragging with the track titles.
+                    Box(
+                        modifier = Modifier
+                            .size(30.dp)
+                            .accentSurface(shape = AppShapes.pill, alpha = 0.12f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "${index + 1}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(track.title, style = MaterialTheme.typography.bodyMedium,
                             maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -207,7 +259,13 @@ private fun PreviewHeader(
     onOpenSaved: () -> Unit,
     regenerating: Boolean
 ) {
-    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+    Column(
+        modifier = Modifier
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .fillMaxWidth()
+            .softSurface(shape = AppShapes.xlarge)
+            .padding(16.dp)
+    ) {
         Text(preview.name, style = MaterialTheme.typography.titleLarge)
         if (preview.reasoning.isNotBlank()) {
             Text(
@@ -227,26 +285,79 @@ private fun PreviewHeader(
             modifier = Modifier.padding(top = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Button(onClick = onShufflePlay) {
+            Button(onClick = onShufflePlay, shape = AppShapes.pill) {
                 Icon(Icons.Rounded.Shuffle, contentDescription = null, modifier = Modifier.size(18.dp))
                 Text("Shuffle & play", modifier = Modifier.padding(start = 6.dp))
             }
-            OutlinedButton(onClick = onRegenerate, enabled = !regenerating) {
+            OutlinedButton(
+                onClick = onRegenerate,
+                enabled = !regenerating,
+                shape = AppShapes.pill
+            ) {
                 Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                 Text("Regenerate", modifier = Modifier.padding(start = 6.dp))
             }
         }
 
         if (preview.savedPlaylistId == null) {
-            OutlinedButton(onClick = onSave, modifier = Modifier.padding(top = 8.dp)) {
+            OutlinedButton(
+                onClick = onSave,
+                shape = AppShapes.pill,
+                modifier = Modifier.padding(top = 8.dp)
+            ) {
                 Icon(Icons.Rounded.Save, contentDescription = null, modifier = Modifier.size(18.dp))
                 Text("Save as playlist", modifier = Modifier.padding(start = 6.dp))
             }
         } else {
-            OutlinedButton(onClick = onOpenSaved, modifier = Modifier.padding(top = 8.dp)) {
+            OutlinedButton(
+                onClick = onOpenSaved,
+                shape = AppShapes.pill,
+                modifier = Modifier.padding(top = 8.dp)
+            ) {
                 Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp))
                 Text("Saved — open playlist", modifier = Modifier.padding(start = 6.dp))
             }
         }
+    }
+}
+
+/**
+ * A duration preset as a pill. Material's `FilterChip` brings its own container shape and a
+ * leading check that shifts the label sideways when selected; both fight the corner scale and
+ * the fixed-width row of chips, so selection is carried here by fill and weight alone.
+ */
+@Composable
+private fun DurationChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val scheme = MaterialTheme.colorScheme
+    val fill by animateColorAsState(
+        targetValue = if (selected) scheme.primary.copy(alpha = 0.18f)
+        else scheme.surfaceVariant.copy(alpha = 0.45f),
+        animationSpec = Motion.emphasized(),
+        label = "chipFill"
+    )
+    val content by animateColorAsState(
+        targetValue = if (selected) scheme.primary else scheme.onSurfaceVariant,
+        animationSpec = Motion.emphasized(),
+        label = "chipContent"
+    )
+
+    Box(
+        modifier = Modifier
+            .pressable(shape = AppShapes.pill, onClick = onClick, pressedScale = 0.94f)
+            .background(fill, AppShapes.pill)
+            .padding(horizontal = 18.dp, vertical = 10.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            color = content,
+            maxLines = 1
+        )
     }
 }

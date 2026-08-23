@@ -27,7 +27,7 @@ fails you get a readable error and the rest of the app is untouched.
 
 ## Setup
 
-1. Copy the example config and fill it in:
+1. Copy the example config and set the SDK path:
 
    ```bash
    cp local.properties.example local.properties
@@ -35,20 +35,22 @@ fails you get a readable error and the rest of the app is untouched.
 
    ```properties
    sdk.dir=/path/to/Android/sdk
-   LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
-   LLM_API_KEY=...
-   LLM_MODEL=gemini-2.5-flash
    ```
 
-   `local.properties` is git-ignored. The three `LLM_*` keys reach the app through
-   `BuildConfig` and are read in `LlmConfig.fromBuildConfig()`. The client appends
-   `/chat/completions` to the base URL itself, so set the base URL without that suffix.
-   Any OpenAI-compatible provider works; the app ships pointed at Google Gemini, whose
-   key comes from https://aistudio.google.com/apikey
+2. Enter a Hugging Face API key in the app: **Settings → AI Playlists**. Create a free
+   token at https://huggingface.co/settings/tokens. It is stored in the app's private
+   SharedPreferences on the device, so no rebuild is needed to add or change it, and no key
+   is ever committed.
 
-   Leave the `LLM_*` keys out and everything except the AI tab still works; that tab says so.
+   Without a key everything except the AI tab still works; that tab says so.
 
-2. Build and install:
+   The optional `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` entries in `local.properties`
+   still reach the app through `BuildConfig` and act as defaults — set `LLM_BASE_URL` and
+   `LLM_MODEL` to point at any other OpenAI-compatible provider, otherwise the app uses the
+   Hugging Face router. A key entered in Settings always wins over `LLM_API_KEY`. The client
+   appends `/chat/completions` to the base URL itself, so set it without that suffix.
+
+3. Build and install:
 
    ```bash
    ./gradlew :app:installDebug          # build + install on the connected device

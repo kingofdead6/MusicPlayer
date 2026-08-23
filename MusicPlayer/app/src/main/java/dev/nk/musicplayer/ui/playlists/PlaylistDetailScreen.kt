@@ -1,7 +1,8 @@
 package dev.nk.musicplayer.ui.playlists
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -52,6 +53,12 @@ import dev.nk.musicplayer.ui.components.AlbumArt
 import dev.nk.musicplayer.ui.components.EmptyState
 import dev.nk.musicplayer.ui.components.rememberReorderState
 import dev.nk.musicplayer.ui.components.reorderable
+import dev.nk.musicplayer.ui.theme.AppShapes
+import dev.nk.musicplayer.ui.theme.accentGlow
+import dev.nk.musicplayer.ui.theme.Motion
+import dev.nk.musicplayer.ui.theme.Radii
+import dev.nk.musicplayer.ui.theme.pressable
+import dev.nk.musicplayer.ui.theme.softSurface
 import dev.nk.musicplayer.util.formatDuration
 import dev.nk.musicplayer.util.formatDurationLong
 import kotlinx.coroutines.launch
@@ -142,7 +149,33 @@ fun PlaylistDetailScreen(
                 .reorderable(reorder)
         ) {
             item {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth()
+                        .softSurface(shape = AppShapes.xlarge)
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Same cover the playlist row shows: the first track in playlist order.
+                    tracks.firstOrNull()?.let { first ->
+                        AlbumArt(
+                            track = first,
+                            corner = Radii.large,
+                            modifier = Modifier
+                                .size(92.dp)
+                                .accentGlow(
+                                    cornerRadius = Radii.large,
+                                    radius = 18.dp,
+                                    intensity = 0.5f
+                                )
+                        )
+                    }
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(start = 16.dp)
+                    ) {
                     Text(
                         "${tracks.size} tracks · ${formatDurationLong(tracks.sumOf { it.durationMs })}",
                         style = MaterialTheme.typography.bodySmall,
@@ -160,16 +193,28 @@ fun PlaylistDetailScreen(
                         modifier = Modifier.padding(top = 12.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        FilledTonalButton(onClick = { onPlay(tracks, 0, PlaySource.playlist(playlistId)) }) {
+                        FilledTonalButton(
+                            shape = AppShapes.pill,
+                            onClick = { onPlay(tracks, 0, PlaySource.playlist(playlistId)) }
+                        ) {
                             Icon(Icons.Rounded.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Text("Play", modifier = Modifier.padding(start = 6.dp))
+                            Text(
+                                "Play",
+                                maxLines = 1,
+                                modifier = Modifier.padding(start = 6.dp)
+                            )
                         }
-                        FilledTonalButton(onClick = {
+                        FilledTonalButton(shape = AppShapes.pill, onClick = {
                             onPlay(tracks.shuffled(), 0, PlaySource.playlist(playlistId))
                         }) {
                             Icon(Icons.Rounded.Shuffle, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Text("Shuffle", modifier = Modifier.padding(start = 6.dp))
+                            Text(
+                                "Shuffle",
+                                maxLines = 1,
+                                modifier = Modifier.padding(start = 6.dp)
+                            )
                         }
+                    }
                     }
                 }
             }
@@ -177,17 +222,33 @@ fun PlaylistDetailScreen(
             itemsIndexed(tracks, key = { index, track -> "${track.id}@$index" }) { index, track ->
                 val listIndex = index + 1
                 val isDragging = reorder.draggingIndex == listIndex
+
+                // Same lift as the queue: the dragged tile rises and brightens so it reads as
+                // picked up rather than merely re-tinted.
+                val lift by animateDpAsState(
+                    targetValue = if (isDragging) 10.dp else 0.dp,
+                    animationSpec = Motion.emphasized(Motion.Quick),
+                    label = "playlistLift"
+                )
+                val fill by animateColorAsState(
+                    targetValue = if (isDragging) MaterialTheme.colorScheme.surfaceVariant
+                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                    animationSpec = Motion.emphasized(),
+                    label = "playlistFill"
+                )
+
                 Row(
                     modifier = Modifier
                         .graphicsLayer { translationY = if (isDragging) reorder.dragOffset else 0f }
-                        .then(if (isDragging) Modifier.shadow(6.dp) else Modifier)
                         .fillMaxWidth()
-                        .background(
-                            if (isDragging) MaterialTheme.colorScheme.surfaceVariant
-                            else MaterialTheme.colorScheme.surface
+                        .padding(horizontal = 12.dp, vertical = 3.dp)
+                        .shadow(lift, AppShapes.large)
+                        .pressable(
+                            shape = AppShapes.large,
+                            onClick = { onPlay(tracks, index, PlaySource.playlist(playlistId)) }
                         )
-                        .clickable { onPlay(tracks, index, PlaySource.playlist(playlistId)) }
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .background(fill, AppShapes.large)
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
@@ -196,10 +257,11 @@ fun PlaylistDetailScreen(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     AlbumArt(
-                        albumId = track.albumId,
+                        track = track,
+                        corner = Radii.medium,
                         modifier = Modifier
                             .padding(horizontal = 12.dp)
-                            .size(44.dp)
+                            .size(46.dp)
                     )
                     Column(modifier = Modifier.weight(1f)) {
                         Text(track.title, style = MaterialTheme.typography.bodyMedium,
