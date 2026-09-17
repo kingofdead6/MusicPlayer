@@ -32,6 +32,9 @@ android {
         buildConfigField("String", "LLM_BASE_URL", "\"${secret("LLM_BASE_URL")}\"")
         buildConfigField("String", "LLM_API_KEY", "\"${secret("LLM_API_KEY")}\"")
         buildConfigField("String", "LLM_MODEL", "\"${secret("LLM_MODEL")}\"")
+        // Speech-to-text endpoint for song analysis. Empty means the Hugging Face Whisper
+        // deployment; the same API key is used for both.
+        buildConfigField("String", "STT_URL", "\"${secret("STT_URL")}\"")
     }
 
     buildTypes {

@@ -21,6 +21,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Shuffle
@@ -29,6 +30,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -43,6 +46,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.nk.musicplayer.data.analysis.AnalysisRepository
+import dev.nk.musicplayer.data.db.SongAnalysis
 import dev.nk.musicplayer.data.db.Track
 import dev.nk.musicplayer.playback.PlaySource
 import dev.nk.musicplayer.ui.theme.AppShapes
@@ -67,6 +72,8 @@ fun AiScreen(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val coverage by viewModel.coverage.collectAsStateWithLifecycle()
+    val analysisProgress by viewModel.analysisProgress.collectAsStateWithLifecycle()
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -197,6 +204,17 @@ fun AiScreen(
             }
         }
 
+        item {
+            AnalysisCard(
+                coverage = coverage,
+                progress = analysisProgress,
+                enabled = state.configured,
+                onAnalyze = viewModel::analyzeLibrary,
+                onStop = viewModel::stopAnalysis,
+                onDismissMessage = viewModel::dismissAnalysisMessage
+            )
+        }
+
         val preview = state.preview
         if (preview != null) {
             item {
@@ -243,6 +261,11 @@ fun AiScreen(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
+                        // Why this song is here: what the app heard in it.
+                        preview.analyses[track.id]?.let { analysis ->
+                            Spacer(Modifier.height(4.dp))
+                            AnalysisChips(analysis)
+                        }
                     }
                 }
             }
@@ -360,4 +383,148 @@ private fun DurationChip(
             maxLines = 1
         )
     }
+}
+
+/**
+ * The listening panel: how much of the library the app has actually heard, and the control to
+ * hear more of it.
+ *
+ * Analysis is deliberately a manual, resumable batch rather than something that happens on
+ * scan. It costs two network calls per song, so the user decides when to spend them, can stop
+ * mid-run, and never loses finished work.
+ */
+@Composable
+private fun AnalysisCard(
+    coverage: AnalysisRepository.Coverage,
+    progress: AnalysisRepository.Progress,
+    enabled: Boolean,
+    onAnalyze: () -> Unit,
+    onStop: () -> Unit,
+    onDismissMessage: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .padding(horizontal = 16.dp)
+            .fillMaxWidth()
+            .softSurface(shape = AppShapes.xlarge)
+            .padding(16.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Rounded.GraphicEq,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
+            )
+            Text(
+                "Song understanding",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(start = 8.dp)
+            )
+        }
+        Text(
+            "Each song is sampled, its words are transcribed, and what it is about — mood, " +
+                "sentiment, energy, subject — is worked out once and remembered. Playlists are " +
+                "then built from that instead of from titles.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 6.dp)
+        )
+
+        Spacer(Modifier.height(12.dp))
+        Text(
+            when {
+                coverage.total == 0 -> "No songs in the library yet."
+                coverage.complete -> "All ${coverage.total} songs analysed."
+                else -> "${coverage.analyzed} of ${coverage.total} songs analysed."
+            },
+            style = MaterialTheme.typography.labelLarge
+        )
+        Spacer(Modifier.height(8.dp))
+        LinearProgressIndicator(
+            progress = { if (progress.running) progress.fraction else coverage.fraction },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp),
+            trackColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+
+        if (progress.running) {
+            Text(
+                progress.currentTitle?.let { "Listening to $it" } ?: "Starting…",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+            Text(
+                "${progress.done} of ${progress.total} done" +
+                    if (progress.failed > 0) " · ${progress.failed} failed" else "",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            OutlinedButton(
+                onClick = onStop,
+                shape = AppShapes.pill,
+                modifier = Modifier.padding(top = 10.dp)
+            ) {
+                Text("Stop")
+            }
+        } else {
+            Button(
+                onClick = onAnalyze,
+                enabled = enabled && coverage.total > 0 && !coverage.complete,
+                shape = AppShapes.pill,
+                modifier = Modifier.padding(top = 12.dp)
+            ) {
+                Icon(Icons.Rounded.GraphicEq, contentDescription = null,
+                    modifier = Modifier.size(18.dp))
+                Text(
+                    if (coverage.analyzed == 0) "Analyse my songs" else "Analyse the rest",
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
+        }
+
+        progress.message?.let { message ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(top = 8.dp)
+            ) {
+                Text(
+                    message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(onClick = onDismissMessage) { Text("OK") }
+            }
+        }
+    }
+}
+
+/** Mood, what it suits, and the strongest theme — the short version of a verdict. */
+@Composable
+private fun AnalysisChips(analysis: SongAnalysis) {
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        VerdictChip(analysis.mood)
+        VerdictChip(analysis.category)
+        analysis.themeList.firstOrNull()?.let { VerdictChip(it) }
+    }
+}
+
+@Composable
+private fun VerdictChip(label: String) {
+    if (label.isBlank() || label == "unknown") return
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.primary,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier
+            .accentSurface(shape = AppShapes.pill, alpha = 0.12f)
+            .padding(horizontal = 8.dp, vertical = 3.dp)
+    )
 }

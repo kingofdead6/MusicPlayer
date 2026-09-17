@@ -85,24 +85,7 @@ object PlaylistResponseParser {
      * Strips markdown fences and any chatter around the object. Models routinely wrap JSON in
      * ```json fences or preface it with "Here is your playlist:".
      */
-    internal fun extractJsonObject(raw: String): String? {
-        var text = raw.trim()
-        if (text.isEmpty()) return null
-
-        // Remove fenced blocks by taking what is inside the first fence pair, if present.
-        val fence = Regex("```(?:[A-Za-z0-9_-]*)?\\s*\\n?([\\s\\S]*?)```")
-        fence.find(text)?.let { match ->
-            val inner = match.groupValues[1].trim()
-            if (inner.isNotEmpty()) text = inner
-        }
-        // A stray unterminated fence can survive the pass above.
-        text = text.removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
-
-        val start = text.indexOf('{')
-        val end = text.lastIndexOf('}')
-        if (start == -1 || end == -1 || end <= start) return null
-        return text.substring(start, end + 1)
-    }
+    internal fun extractJsonObject(raw: String): String? = LlmJson.extractObject(raw)
 
     private fun JsonObject.stringOrNull(key: String): String? =
         (this[key] as? JsonPrimitive)?.content
