@@ -11,3 +11,8 @@ sdk.dir=/path/to/Android/sdk
 #LLM_BASE_URL=https://router.huggingface.co/v1
 #LLM_API_KEY=
 #LLM_MODEL=meta-llama/Llama-3.3-70B-Instruct
+
+# Optional override for the speech-to-text endpoint used by song analysis. Leave it out to
+# use the Hugging Face Whisper deployment. It takes raw audio bytes and answers with
+# {"text": "..."}; the key above (or the one entered in Settings) authenticates it.
+#STT_URL=https://router.huggingface.co/hf-inference/models/openai/whisper-large-v3

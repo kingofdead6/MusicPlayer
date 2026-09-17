@@ -123,6 +123,7 @@ fun AppNavigation(modifier: Modifier = Modifier) {
         factory = AiViewModel.factory(
             container.aiPlaylistGenerator,
             container.playlistRepository,
+            container.analysisRepository,
             container.settingsStore.hfApiKey
         )
     )

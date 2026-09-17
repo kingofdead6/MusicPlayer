@@ -131,7 +131,7 @@ fun SettingsScreen(
             )
         }
 
-        item { SectionLabel("AI PLAYLISTS") }
+        item { SectionLabel("AI PLAYLISTS & ANALYSIS") }
 
         item {
             ApiKeyCard(
@@ -418,8 +418,8 @@ private fun ApiKeyCard(
         ) {
             Text(
                 when {
-                    storedKey.isBlank() -> "No key saved — AI playlists are off."
-                    saved -> "Key saved. AI playlists are ready."
+                    storedKey.isBlank() -> "No key saved — AI playlists and song analysis are off."
+                    saved -> "Key saved. AI playlists and song analysis are ready."
                     else -> "Unsaved changes."
                 },
                 style = MaterialTheme.typography.bodySmall,

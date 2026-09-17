@@ -81,3 +81,57 @@ data class PlayEvent(
     /** "library" | "playlist:<id>" | "shuffle" */
     val source: String
 )
+
+/**
+ * What the app worked out about one song by listening to it.
+ *
+ * Produced by [dev.nk.musicplayer.data.analysis.SongAnalyzer]: a short sample of the file is
+ * transcribed by a speech-to-text model, and the transcript plus the file's metadata are
+ * classified by the LLM. The row is a cache — deriving it costs two network calls, so it is
+ * written once and re-used by every later playlist request.
+ *
+ * [transcript] is a capped excerpt kept only so a re-analysis (a better prompt, a different
+ * model) does not have to pay for transcription again. It is device-local and the UI never
+ * renders it; only the derived fields are shown.
+ */
+@Entity(
+    tableName = "song_analysis",
+    indices = [Index("mood"), Index("category"), Index("sentiment")]
+)
+data class SongAnalysis(
+    @PrimaryKey val trackId: Long,
+    val analyzedAt: Long,
+    /** "lyrics" when a transcript was obtained, "metadata" when the song had no usable vocals. */
+    val source: String,
+    /** Language of the vocals as the model heard them, or "unknown"/"instrumental". */
+    val language: String,
+    /** positive | negative | neutral | mixed */
+    val sentiment: String,
+    /** A single word from a small vocabulary: hopeful, melancholic, angry, … */
+    val mood: String,
+    /** What the song is *for*: party, workout, focus, driving, heartbreak, … */
+    val category: String,
+    val genre: String,
+    /** 0 = bleak, 1 = joyful. */
+    val valence: Float,
+    /** 0 = still, 1 = frantic. */
+    val energy: Float,
+    /** Comma-separated subject matter, e.g. "loss, memory, home". */
+    val themes: String,
+    /** One line in the model's own words about what the song is doing. */
+    val summary: String,
+    val explicit: Boolean,
+    /** Capped transcript excerpt, kept for cheap re-analysis. Never displayed. */
+    val transcript: String
+) {
+    val themeList: List<String>
+        get() = themes.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+
+    /** True when the classification came from a transcript rather than the file's tags alone. */
+    val fromLyrics: Boolean get() = source == SOURCE_LYRICS
+
+    companion object {
+        const val SOURCE_LYRICS = "lyrics"
+        const val SOURCE_METADATA = "metadata"
+    }
+}

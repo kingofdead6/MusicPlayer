@@ -1,6 +1,8 @@
 package dev.nk.musicplayer.data.llm
 
 import android.util.Log
+import dev.nk.musicplayer.data.db.SongAnalysis
+import dev.nk.musicplayer.data.db.SongAnalysisDao
 import dev.nk.musicplayer.data.db.Track
 import dev.nk.musicplayer.data.library.LibraryRepository
 import dev.nk.musicplayer.util.formatDuration
@@ -10,17 +12,26 @@ import dev.nk.musicplayer.util.formatDuration
  *
  * The model only ever sees a numbered list and only ever answers with numbers. Titles it
  * returns are ignored entirely — see [PlaylistResponseParser.sanitize].
+ *
+ * Every song that has been through
+ * [dev.nk.musicplayer.data.analysis.SongAnalyzer] carries its verdict into the digest, so the
+ * curator is choosing on what the songs are about — mood, sentiment, energy, subject matter —
+ * instead of inferring everything from an artist name it may never have heard of. Songs that
+ * have not been analysed still appear, just bare, and the prompt says which is which.
  */
 class AiPlaylistGenerator(
     private val library: LibraryRepository,
-    private val client: LlmClient
+    private val client: LlmClient,
+    private val analysisDao: SongAnalysisDao
 ) {
 
     sealed interface Result {
         data class Success(
             val name: String,
             val reasoning: String,
-            val tracks: List<Track>
+            val tracks: List<Track>,
+            /** What the app knows about the chosen songs, for the preview's mood chips. */
+            val analyses: Map<Long, SongAnalysis> = emptyMap()
         ) : Result
 
         data class Failure(val message: String) : Result
@@ -34,13 +45,16 @@ class AiPlaylistGenerator(
             return Result.Failure("There is no music in the library yet. Scan first.")
         }
 
-        val digest = buildDigest(tracks)
+        val analyses = analysisDao.all().associateBy { it.trackId }
+        Log.i(TAG, "${analyses.size} of ${tracks.size} tracks have an analysis")
+
+        val digest = buildDigest(tracks, analyses)
         val indices = if (digest.length <= DIGEST_CHAR_LIMIT) {
             Log.i(TAG, "single-pass: ${tracks.size} tracks, ${digest.length} chars")
             selectSinglePass(request, targetMinutes, digest, tracks.indices)
         } else {
             Log.i(TAG, "chunked: ${tracks.size} tracks, ${digest.length} chars exceeds $DIGEST_CHAR_LIMIT")
-            selectChunked(request, targetMinutes, tracks)
+            selectChunked(request, targetMinutes, tracks, analyses)
         }
 
         return when (indices) {
@@ -53,7 +67,12 @@ class AiPlaylistGenerator(
                             "library. Try a broader request."
                     )
                 } else {
-                    Result.Success(indices.name, indices.reasoning, chosen)
+                    Result.Success(
+                        name = indices.name,
+                        reasoning = indices.reasoning,
+                        tracks = chosen,
+                        analyses = analyses.filterKeys { id -> chosen.any { it.id == id } }
+                    )
                 }
             }
         }
@@ -87,16 +106,17 @@ class AiPlaylistGenerator(
     private suspend fun selectChunked(
         request: String,
         targetMinutes: Int?,
-        tracks: List<Track>
+        tracks: List<Track>,
+        analyses: Map<Long, SongAnalysis>
     ): Selection {
-        val chunks = chunkTracks(tracks)
+        val chunks = chunkTracks(tracks, analyses)
         Log.i(TAG, "chunked: ${chunks.size} chunks")
 
         val candidates = LinkedHashSet<Int>()
         var anyChunkSucceeded = false
 
         chunks.forEach { chunk ->
-            val chunkDigest = buildDigest(chunk.map { tracks[it] })
+            val chunkDigest = buildDigest(chunk.map { tracks[it] }, analyses)
             val messages = listOf(
                 ChatMessage("system", CHUNK_SYSTEM_PROMPT),
                 ChatMessage("user", userPrompt(request, targetMinutes, chunkDigest))
@@ -119,7 +139,7 @@ class AiPlaylistGenerator(
         }
 
         val shortlist = candidates.toList()
-        val finalDigest = buildDigest(shortlist.map { tracks[it] })
+        val finalDigest = buildDigest(shortlist.map { tracks[it] }, analyses)
         Log.i(TAG, "chunked: final pass over ${shortlist.size} candidates, ${finalDigest.length} chars")
 
         val messages = listOf(
@@ -175,28 +195,78 @@ class AiPlaylistGenerator(
 
     // ---- prompt construction ---------------------------------------------------------
 
-    /** `0. Artist — Title (3:42)`, one per line, in stable id order. */
-    internal fun buildDigest(tracks: List<Track>): String = buildString {
+    /**
+     * One line per song, in stable id order:
+     *
+     * ```
+     * 0. Artist — Title (3:42)
+     * 1. Artist — Title (4:15) | hopeful, positive | for: driving | energy .7 valence .8 | indie rock | about: road, freedom
+     * ```
+     *
+     * The tags after the first pipe are only present for songs that have been analysed.
+     */
+    internal fun buildDigest(
+        tracks: List<Track>,
+        analyses: Map<Long, SongAnalysis> = emptyMap()
+    ): String = buildString {
         tracks.forEachIndexed { index, track ->
-            append(index)
-            append(". ")
-            append(track.artist)
-            append(" — ")
-            append(track.title)
-            append(" (")
-            append(formatDuration(track.durationMs))
-            append(")\n")
+            append(digestLine(index, track, analyses[track.id]))
+            append('\n')
         }
     }
 
+    private fun digestLine(index: Int, track: Track, analysis: SongAnalysis?): String = buildString {
+        append(index)
+        append(". ")
+        append(track.artist)
+        append(" — ")
+        append(track.title)
+        append(" (")
+        append(formatDuration(track.durationMs))
+        append(")")
+        if (analysis == null) return@buildString
+
+        append(" | ")
+        append(analysis.mood)
+        append(", ")
+        append(analysis.sentiment)
+        append(" | for: ")
+        append(analysis.category)
+        append(" | energy ")
+        append(oneDecimal(analysis.energy))
+        append(" valence ")
+        append(oneDecimal(analysis.valence))
+        if (analysis.genre.isNotBlank() && analysis.genre != "unknown") {
+            append(" | ")
+            append(analysis.genre)
+        }
+        if (analysis.themes.isNotBlank()) {
+            append(" | about: ")
+            append(analysis.themes)
+        }
+        // "heard" vs "guessed": a verdict from a transcript is worth more than one from a
+        // filename, and the curator is told to weigh them that way.
+        if (!analysis.fromLyrics) append(" | tags only")
+    }
+
+    /** `.7`, not `0.7000000001`: the digest is charged for by the character. */
+    private fun oneDecimal(value: Float): String {
+        val rounded = (value * 10).toInt().coerceIn(0, 10)
+        return if (rounded == 10) "1.0" else ".$rounded"
+    }
+
     /** Splits library positions into groups whose digest stays under [CHUNK_CHAR_LIMIT]. */
-    private fun chunkTracks(tracks: List<Track>): List<List<Int>> {
+    private fun chunkTracks(
+        tracks: List<Track>,
+        analyses: Map<Long, SongAnalysis>
+    ): List<List<Int>> {
         val chunks = ArrayList<List<Int>>()
         var current = ArrayList<Int>()
         var size = 0
         tracks.forEachIndexed { index, track ->
-            // "9999. " + artist + " — " + title + " (0:00)\n"
-            val lineLength = track.artist.length + track.title.length + 20
+            // Measured rather than estimated: an analysed line is several times longer than
+            // a bare one, and guessing here is what overflows a request.
+            val lineLength = digestLine(9999, track, analyses[track.id]).length + 1
             if (size + lineLength > CHUNK_CHAR_LIMIT && current.isNotEmpty()) {
                 chunks.add(current)
                 current = ArrayList()
@@ -237,14 +307,36 @@ class AiPlaylistGenerator(
 You are a music curator. You will receive a numbered list of songs from the
 user's personal library, and a request describing the playlist they want.
 
-Select songs from the list that fit the request. Use your knowledge of these
-artists and songs to judge mood, energy, and style — the list contains no
-genre or tempo data.
+Most songs carry tags the app worked out by transcribing the song's own vocals
+and reading what it heard:
+
+  12. Artist — Title (3:42) | hopeful, positive | for: driving |
+      energy .7 valence .8 | indie rock | about: road, freedom
+
+  mood, sentiment  what the song feels like and whether it lands positive,
+                   negative, neutral or mixed
+  for:             the situation it suits — party, workout, focus, chill,
+                   driving, sleep, heartbreak, love, motivation, protest,
+                   spiritual, celebration, reflection
+  energy           .0 still to 1.0 frantic
+  valence          .0 bleak to 1.0 joyful
+  about:           what the words are actually about
+  tags only        no words could be transcribed, so those tags are a guess
+                   from the title and artist — trust them less
+
+Trust the tags over your own impression of a title: they come from the song
+itself. A line with no tags after the duration has not been analysed yet —
+judge it from the artist and title as best you can, and prefer a tagged song
+when the two are otherwise equal.
+
+Match the request against the tags first: a request for a mood, a feeling or a
+situation is answered by mood, sentiment, for: and about:, not by genre.
 
 Rules:
 - Only return index numbers that appear in the provided list.
-- Order the indices deliberately: build a listening arc that fits the request
-  (ease in, build, sustain, wind down) rather than a random ordering.
+- Order the indices deliberately: build a listening arc that fits the request,
+  using energy and valence to shape it (ease in, build, sustain, wind down)
+  rather than a random ordering.
 - Respect the requested total duration within about 10%.
 - Do not repeat an index.
 - Avoid stacking more than two songs by the same artist consecutively.
@@ -263,6 +355,12 @@ Respond with JSON only, no markdown fences, no commentary:
 You are a music curator shortlisting candidates. You will receive part of a
 numbered list of songs from the user's personal library, and a request
 describing the playlist they want.
+
+Songs may carry tags the app worked out from the song's own words —
+`| mood, sentiment | for: situation | energy .N valence .N | genre |
+about: subjects |` — and `tags only` marks a song whose words could not be
+transcribed, so its tags are a weaker guess. Use the tags first; fall back on
+what you know about the artist for untagged lines.
 
 Return the index numbers of every song in this part that could plausibly fit
 the request. Be generous: this is a shortlist that will be narrowed down
